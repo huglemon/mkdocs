@@ -1,11 +1,11 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "mkdocs",
+  "name": "inwind-docs",
   "compatibility_date": "2026-07-26",
   "workers_dev": false,
   "routes": [
     {
-      "pattern": "docs.mksaas.link",
+      "pattern": "docs.inwindoverseas.com",
       "custom_domain": true
     }
   ],

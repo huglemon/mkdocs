@@ -1,0 +1,29 @@
+---
+title: 部署与域名
+description: Vercel 部署、自定义域名绑定、DNS 验证、SSL。
+icon: Cloud
+---
+
+# 部署与域名
+
+## Vercel 部署
+
+- 建站勾选「同时创建 Vercel 部署」→ 自动创建 Vercel 项目 + 注入 env + 触发构建
+- 站点详情页「部署状态」查看进度，READY 后获得预览域名
+- 模板分支推送后，重新部署生效
+
+注入 env：ADMIN_API_URL、SITE_ID、SITE_SECRET、NEXT_PUBLIC 系列（语言/Umami/取数）。
+
+## 自定义域名
+
+「域名管理」→ 输入域名 →「添加」：
+1. 绑定：Vercel 项目绑定域名（已在 Vercel 绑定则自动接管）
+2. DNS 验证：显示验证记录（TXT/CNAME），去域名服务商配置
+3. 验证：配置 DNS 后点「验证」，通过则启用
+4. SSL：验证通过后 Vercel 自动签发证书
+
+域名托管在 Cloudflare 时，在 Cloudflare 加对应 DNS 记录指向 Vercel。
+
+## 移除域名
+
+删除域名后回退到预览域名（vercel.app 别名），正式域名清除。

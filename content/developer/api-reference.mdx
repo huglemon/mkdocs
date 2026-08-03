@@ -1,0 +1,64 @@
+---
+title: 公开 API 参考
+description: 前台站点调用的 admin 公开 API 端点与鉴权。
+icon: Code
+---
+
+# 公开 API 参考
+
+客户前台站点通过公开 API 从 admin 取数/提交。所有端点带 X-Site-Id / X-Site-Secret 请求头鉴权。
+
+## 鉴权
+
+```
+X-Site-Id: <站点 id>
+X-Site-Secret: <站点密钥>
+```
+
+站点密钥在后台站点详情页「API 凭证」获取。校验失败返回 401/403。
+
+## 端点清单
+
+### 站点设置
+
+GET /api/v1/pub/b2b/site/settings — 公司信息 + 语言配置。
+
+### 导航
+
+POST /api/v1/pub/b2b/site/navigation（body 传 locale）— 导航树。
+
+### 页面
+
+GET /api/v1/pub/b2b/pages/页面slug?locale= — 页面 + 页面块。
+
+### 内容
+
+- POST /api/v1/pub/b2b/content/products — 产品列表
+- GET /api/v1/pub/b2b/content/products/产品slug — 产品详情
+- POST /api/v1/pub/b2b/content/posts — 文章列表
+- GET /api/v1/pub/b2b/content/posts/文章slug — 文章详情
+- GET /api/v1/pub/b2b/content/authors/作者slug — 作者 + 文章
+
+### 表单
+
+GET /api/v1/pub/b2b/forms/表单slug — 表单字段定义，前台动态渲染。
+
+### 询盘
+
+POST /api/v1/pub/b2b/inquiry — 提交询盘。body：formTemplateId、token、fields、utm、path。
+
+- 按表单字段动态校验，返回逐字段错误
+- 防重复：同 IP + 同内容 60 秒内重复提交返回 409
+- 采集 IP/UA/Referrer/UTM 入库
+
+### 素材
+
+GET /api/v1/pub/b2b/content/assets — 站点素材。
+
+## 数据缓存
+
+GET 请求支持 next.tags（ISR on-demand 失效）。前台用 tag 关联缓存，admin 改内容后即时刷新。
+
+## 错误格式
+
+非 2xx 返回 error 字段（中文提示），校验类返回 error + errors 数组。

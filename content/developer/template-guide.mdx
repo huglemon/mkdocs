@@ -1,0 +1,49 @@
+---
+title: 模板开发规范
+description: 创建客户模板分支、数据契约、多语言与部署。
+icon: Blocks
+---
+
+# 模板开发规范
+
+模板是客户网站的视觉层 + 数据层。开发新模板遵循本规范，保证与平台数据契约兼容。
+
+## 仓库与分支
+
+- 模板独立仓库：github.com/huglemon/inwind-site-template
+- main = 基础模板（通用能力与修复），新模板从 main 创建分支
+- 客户定制分支：client-站点slug（如 client-chengfeng）
+
+## 数据契约（红线，不可改）
+
+前台所有数据来自 admin API，通过 `lib/api-client.ts` 取数：getSiteSettings、getProducts、getPosts、getPage、getNavigation、submitInquiry、getFormBySlug。
+
+**不要改这些函数签名** — 需要新字段找 admin 扩展。
+
+## 多语言路由
+
+- 页面在 app/lang 下，lang 为语言参数
+- 语言配置（默认/前台/多语言开关）由平台在后台配置
+- 单语言站 URL 无语言前缀（clean URL），多语言站带前缀
+
+## 页面块渲染
+
+页面内容由后台「页面数据」的块组成。前台 getPage 拿 blocks 后按类型渲染：
+- 通用页面：page-renderer 自动按块类型渲染
+- 定制页面：手动取特定块（见「页面块调用」文档）
+
+## 环境变量
+
+`.env.local` 必须配置：ADMIN_API_URL（admin 地址）、SITE_ID（站点 id）、SITE_SECRET（站点密钥）。
+
+## 部署
+
+客户站点部署到 Vercel（由平台后台触发）。模板分支推送后，平台重新部署生效。
+
+## 验证
+
+```bash
+pnpm types:check
+pnpm build
+pnpm dev --webpack
+```

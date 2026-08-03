@@ -1,0 +1,68 @@
+---
+title: 页面块调用与渲染
+description: 后台页面数据（块）的取数与渲染规范。
+icon: LayoutTemplate
+---
+
+# 页面块调用与渲染
+
+后台「页面数据」里，每个页面由若干 **PageBlock（块）** 组成。前台用 `getPage` 拉取页面，拿到 blocks，按块 type 渲染。
+
+## 块类型清单
+
+| type | 语义 | data 结构 |
+|---|---|---|
+| text | 单段文案 | text、heading |
+| carousel | 图片/轮播/背景图 | items 数组（imageUrl/alt/link/title） |
+| gallery | 相册 | title + items 数组 |
+| list | 列表条目 | columns + rows |
+| json | 原始 JSON | value 字符串 |
+| html | 富文本 HTML | html 字符串 |
+| post-list | 文章列表 | limit/categoryIds/sort |
+| product-list | 产品列表 | limit/categoryIds/sort |
+| group | 后台分组容器（不渲染） | label |
+| form | 询盘表单 | formSlug |
+
+## 取数
+
+```tsx
+import { getPage } from "@/lib/api-client";
+const page = await getPage("home", { locale: lang }).catch(() => null);
+const blocks = page?.blocks ?? [];
+```
+
+## 两种渲染模式
+
+### 模式 A：通用页面自动渲染
+
+`app/[lang]/[slug]/page.tsx` 的 `<PageRenderer>` 按块 type 自动渲染（text/html/carousel/gallery/json/form 内置）。后台配置的通用页面直接生效。
+
+### 模式 B：定制页面按 slug 取数
+
+用 `blocks-to-marketing.ts` 的解析函数：
+
+```tsx
+import { toBlocksBySlug, getTextValue, getListRows, getCarouselFirst, getCtaList } from "@/components/client/home/blocks-to-marketing";
+
+const blocks = toBlocksBySlug(page?.blocks ?? []);
+const heroTitle = getTextValue(blocks, "hero-title");
+const heroCta = getCtaList(blocks, "hero-cta");
+const services = getListRows(blocks, "service-grid-list");
+```
+
+## 表单块
+
+```tsx
+import { InquiryForm } from "@/components/inquiry/inquiry-form";
+const formBlock = page?.blocks?.find((b) => b.type === "form" && b.data?.formSlug);
+<InquiryForm lang={lang} formSlug={formBlock?.data?.formSlug ?? "default-inquiry"} />
+```
+
+## Slug 命名约定
+
+块 slug 按「page-section-field」模式：首页省略 page 前缀（hero-title），非首页带前缀（about-narrative-title）。每个 section 前置 group 容器块。
+
+## 参考实现
+
+- 解析函数：`components/client/home/blocks-to-marketing.ts`
+- 通用渲染：`components/page/page-renderer.tsx`

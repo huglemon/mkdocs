@@ -1,5 +1,5 @@
 {
-  "name": "mkdocs",
+  "name": "inwind-docs",
   "description": "A fast documentation template powered by FumaPress and deployed on Cloudflare Workers.",
   "private": true,
   "license": "MIT",

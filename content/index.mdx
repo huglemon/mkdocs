@@ -1,33 +1,32 @@
 ---
 title: Introduction
-description: A fast documentation template powered by FumaPress and deployed on Cloudflare Workers.
+description: InWind CMS 文档中心 — 客户使用指南、模板开发规范与开发者 API。
 icon: BookOpen
 ---
 
-Create a fast documentation site with FumaPress and deploy it directly to Cloudflare Workers.
+# InWind CMS 文档中心
+
+InWind CMS 是一套外贸 B2B 建站系统：通过可视化后台管理内容、表单、询盘与 SEO，前台网站按需渲染，数据即时生效。
 
 <Cards>
-  <Card title="Getting Started" href="/getting-started" icon={<Rocket />}>
-    Run the project and publish your first page.
+  <Card title="客户使用指南" href="/customer/getting-started" icon={<Users />}>
+    管理网站内容、表单、询盘与 SEO — 所有客户可看。
   </Card>
-  <Card title="MkDocs components" href="/guides/components" icon={<Blocks />}>
-    Explore the MDX components included with the template.
+  <Card title="模板开发规范" href="/developer/template-guide" icon={<Blocks />}>
+    面向模板开发者：页面块调用、渲染与部署。
   </Card>
-  <Card title="Write docs" href="/guides/authoring" icon={<FileText />}>
-    Organize pages, navigation, metadata, links, and assets.
-  </Card>
-  <Card title="Deploy to Workers" href="/guides/deployment" icon={<Cloud />}>
-    Build and publish the static site with Wrangler.
+  <Card title="平台后台手册" href="/platform/overview" icon={<Shield />}>
+    平台运营：客户、站点、部署、域名与语言配置。
   </Card>
 </Cards>
 
-## Included by default
+## 核心能力
 
-- Markdown and MDX content with reusable Fumadocs components
-- Static search, keyboard shortcuts, theme switching, and responsive navigation
-- Per-page Markdown, `llms.txt`, a project-wide Open Graph image, and sitemap
-- Static deployment to Cloudflare Workers with Wrangler
+- **可视化内容管理**：文章、产品、页面块（文字/图片/列表/表单）后台直接编辑
+- **表单与询盘**：自定义表单字段、防重复提交、来源追踪、Umami 会话关联
+- **多语言**：默认语言/前台语言/多语言开关由平台配置，前台按需渲染
+- **SEO**：每页独立标题/描述/关键词，前台自动生成 meta
 
-<Callout title="Template boundary">
-  Keep shared behavior in the template. A new site should mainly update `content/`, `public/`, `src/site.config.ts`, and `wrangler.jsonc`.
-</Callout>
+## 快速开始
+
+新客户网站由平台开通后，登录后台即可开始管理内容。详见「客户使用指南」。

@@ -1,20 +1,20 @@
 export const siteConfig = {
-  name: 'MkDocs',
+  name: 'InWind Docs',
   description:
-    'A fast documentation template powered by FumaPress and deployed on Cloudflare Workers.',
+    'InWind CMS 文档中心 — 客户使用指南、模板开发规范与开发者 API。',
   url:
     import.meta.env.PUBLIC_SITE_URL ??
-    'https://docs.mksaas.link',
+    'https://docs.inwindoverseas.com',
   logo: '/logo.svg',
   favicon: '/favicon.svg',
   ogImage: '/og.png',
-  twitterHandle: '@tanstarter',
-  homeLabel: 'Website',
-  homeUrl: 'https://github.com/open-fox/mkdocs',
-  githubUrl: 'https://github.com/open-fox/mkdocs',
+  twitterHandle: '',
+  homeLabel: '官网',
+  homeUrl: 'https://inwind.cn',
+  githubUrl: 'https://github.com/huglemon/inwind-cms-saas',
   git: {
-    user: 'open-fox',
+    user: 'huglemon',
     repo: 'mkdocs',
-    branch: 'main',
+    branch: 'inwind-docs',
   },
 } as const;

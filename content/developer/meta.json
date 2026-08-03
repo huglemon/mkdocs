@@ -1,0 +1,5 @@
+{
+  "title": "模板开发",
+  "icon": "Blocks",
+  "pages": ["template-guide", "page-blocks", "api-reference"]
+}
