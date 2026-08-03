@@ -1,5 +1,5 @@
 export const siteConfig = {
-  name: 'InWind Docs',
+  name: import.meta.env.PUBLIC_SITE_NAME ?? 'InWind Docs',
   description:
     'InWind CMS 文档中心 — 客户使用指南、模板开发规范与开发者 API。',
   url:
@@ -17,4 +17,4 @@ export const siteConfig = {
     repo: 'mkdocs',
     branch: 'inwind-docs',
   },
-} as const;
+};

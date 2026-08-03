@@ -1,15 +1,15 @@
 /**
  * InWind Docs Worker 入口
- * 平台后台手册（/platform/*）需登录：
- * - 检查 cookie `docs_auth`，无则 302 到 /login
- * - POST /api/auth 验证密码 → 种 cookie
- * 其余路径走静态资源。
+ * 双站点模式（SITE_MODE）：
+ * - internal（docs.inwindoverseas.com）：全站需登录（除 /login、/api/*）
+ * - public（docs-website.inwindoverseas.com）：全站公开
  * 密码从环境变量 PLATFORM_DOCS_PASSWORD 读取（不硬编码进仓库）。
  */
 
 interface Env {
 	ASSETS: Fetcher;
 	PLATFORM_DOCS_PASSWORD?: string;
+	SITE_MODE?: "internal" | "public";
 }
 
 const AUTH_COOKIE = "docs_auth";
@@ -34,7 +34,7 @@ function redirectToLogin(url: URL): Response {
 }
 
 function redirectBack(url: URL, cookie?: string): Response {
-	const next = url.searchParams.get("next") ?? "/platform/overview";
+	const next = url.searchParams.get("next") ?? "/";
 	return new Response(null, {
 		status: 302,
 		headers: {
@@ -67,19 +67,20 @@ export default {
 			return redirectBack(url, clearAuthCookie());
 		}
 
-		// 登录页本身放行
-		if (url.pathname.startsWith("/login")) {
+		// 公开站点：直接静态资源
+		if (env.SITE_MODE !== "internal") {
 			return env.ASSETS.fetch(request);
 		}
 
-		// 平台后台手册：需登录
-		if (url.pathname.startsWith("/platform")) {
-			if (!password || !hasValidCookie(request)) {
-				return redirectToLogin(url);
-			}
+		// internal：登录页和 API 放行，其余全站需登录
+		if (url.pathname.startsWith("/login") || url.pathname.startsWith("/api/")) {
+			return env.ASSETS.fetch(request);
 		}
 
-		// 其余路径走静态资源
+		if (!password || !hasValidCookie(request)) {
+			return redirectToLogin(url);
+		}
+
 		return env.ASSETS.fetch(request);
 	},
 };

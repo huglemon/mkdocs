@@ -15,12 +15,14 @@
   "sideEffects": false,
   "scripts": {
     "dev": "waku dev",
-    "build": "waku build && node scripts/normalize-static-output.mjs",
     "start": "waku start",
     "types:check": "fumadocs-mdx && tsc --noEmit",
-    "check": "pnpm types:check && pnpm build && pnpm deploy:dry-run",
-    "deploy:dry-run": "wrangler deploy --dry-run",
-    "deploy": "pnpm build && wrangler deploy"
+    "build:website": "PUBLIC_SITE=website waku build && node scripts/normalize-static-output.mjs",
+    "deploy:website": "pnpm build:website && wrangler deploy -c wrangler-website.jsonc",
+    "check:website": "pnpm types:check && pnpm deploy:website",
+    "build:internal": "PUBLIC_SITE=internal waku build && node scripts/normalize-static-output.mjs",
+    "deploy:internal": "pnpm build:internal && wrangler deploy -c wrangler.jsonc",
+    "check:internal": "pnpm types:check && pnpm deploy:internal"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

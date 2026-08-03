@@ -1,15 +1,15 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "inwind-docs",
+  "name": "inwind-docs-website",
   "main": "worker.ts",
   "compatibility_date": "2026-07-26",
   "workers_dev": false,
   "vars": {
-    "SITE_MODE": "internal"
+    "SITE_MODE": "public"
   },
   "routes": [
     {
-      "pattern": "docs.inwindoverseas.com",
+      "pattern": "docs-website.inwindoverseas.com",
       "custom_domain": true
     }
   ],
