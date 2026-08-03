@@ -20,6 +20,8 @@ import { Github } from './src/components/github-icon';
 import { SidebarFooter } from './src/components/sidebar-footer';
 import { Youtube } from './src/components/youtube-icon';
 import { YoutubeVideo } from './src/components/youtube-video';
+import { PlatformLoginForm } from './src/components/platform-login-form';
+import { PlatformGuard } from './src/components/platform-guard';
 import { siteConfig } from './src/site.config';
 
 const i18n = defineI18n({
@@ -143,6 +145,8 @@ export default defineConfig({
           TypeTable,
           Youtube,
           YoutubeVideo,
+          PlatformLoginForm,
+          PlatformGuard,
         };
       },
     }),
