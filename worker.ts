@@ -72,8 +72,15 @@ export default {
 			return env.ASSETS.fetch(request);
 		}
 
-		// internal：登录页和 API 放行，其余全站需登录
-		if (url.pathname.startsWith("/login") || url.pathname.startsWith("/api/")) {
+		// internal：登录页、静态资源（CSS/JS/图片）和 API 放行，其余全站需登录
+		if (
+			url.pathname.startsWith("/login") ||
+			url.pathname.startsWith("/assets/") ||
+			url.pathname.startsWith("/api/") ||
+			url.pathname === "/favicon.svg" ||
+			url.pathname === "/logo.svg" ||
+			url.pathname === "/og.png"
+		) {
 			return env.ASSETS.fetch(request);
 		}
 
