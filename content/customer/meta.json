@@ -1,5 +1,11 @@
 {
   "title": "客户使用指南",
   "icon": "Users",
-  "pages": ["getting-started", "manage-content", "forms-inquiries", "manage-seo"]
+  "pages": [
+    "getting-started",
+    "manage-content",
+    "forms-inquiries",
+    "manage-assets",
+    "manage-seo"
+  ]
 }

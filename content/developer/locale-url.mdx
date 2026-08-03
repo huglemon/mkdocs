@@ -1,0 +1,62 @@
+---
+title: 多语言与 URL 策略
+description: 单语言 clean URL、多语言前缀、链接生成规范。
+icon: Languages
+---
+
+# 多语言与 URL 策略
+
+前台 URL 根据站点语言配置决定是否带语言前缀。
+
+## URL 形态
+
+- **单语言站**（isMultilingual 关闭）：URL 无语言前缀，干净路径
+  - `/` 首页、`/products` 产品、`/about` 页面
+- **多语言站**（isMultilingual 开启）：URL 带语言前缀
+  - `/` 重定向 `/en`、`/en/products`、`/zh/products`
+
+## 实现：URL 重写（middleware）
+
+`[lang]` 路由段保留（所有页面仍在 app/lang 下），用 middleware 重写 URL 而非改路由结构。原因是 Next.js 动态路由段不能"时而存在时而不存在"，重写是唯一不破坏路由的方案。
+
+**单语言分支**用 `rewrite`（URL 地址栏保持裸路径）而非 `redirect`（会跳带前缀 URL）。旧带前缀链接放行兼容，不 404 或循环。
+
+## 统一链接生成（lib/link.ts）
+
+所有前台链接必须用以下函数，禁止手写 `/${lang}` 模板串：
+
+| 函数 | 作用 |
+|---|---|
+| `getLocalePrefix` | 单语言返回空，多语言返回前台语言 |
+| `hrefLang(lang, path, isMultilingual)` | 页面链接（单语言 clean / 多语言带前缀） |
+| `hrefHome(lang, isMultilingual)` | 首页链接 |
+| `normalizeNavPath(path, lang, isMultilingual)` | 导航 path 归一化（单语言去前缀） |
+
+## 各页面获取语言配置
+
+```tsx
+const settings = await getSiteSettings();
+const isMultilingual = !!settings.isMultilingual;
+```
+
+## 语言配置来源
+
+语言配置（isMultilingual/frontendLocale/defaultLocale）**由平台管理**，前台运行时通过公开 API 拉取。部署时注入语言 env（非硬编码）。
+
+## 部署注意（重要）
+
+**站点实际部署的代码不在 monorepo 的 client-starter**，而在独立仓库 `inwind-site-template`。客户端站点（如乘风出海）从 `client-www-inwind` 分支部署。
+
+**改前台模板功能时的双线同步**：
+1. monorepo `apps/client-starter`（通用骨架）改
+2. 手动移植到 `inwind-site-template` 的同构文件（middleware/lib/link/页面/组件）
+3. 两个仓库分别提交推送
+4. 重新部署目标站点
+
+## 诊断 checklist（单语言站 URL 带前缀时）
+
+1. 检查 middleware 是否含单语言 rewrite 分支
+2. 检查 lib/link.ts 是否存在、链接是否用 hrefLang
+3. 检查部署的分支（独立模板仓库的 client 分支，改动需移植）
+4. 检查 Vercel 项目 env
+5. 重新部署后验证根路径保持 `/`（不重定向带前缀）

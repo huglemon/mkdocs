@@ -1,0 +1,91 @@
+---
+title: 素材库 API
+description: 素材上传、查询、图片缩放（Cloudflare Image Resizing）开发者接口。
+icon: ImagePlus
+---
+
+# 素材库 API
+
+素材库的开发者接口：上传、查询、图片缩放。
+
+## 上传素材
+
+```ts
+const fd = new FormData();
+fd.append("file", file);
+fd.append("siteId", siteId);
+fd.append("source", "cover"); // cover | product | editor | upload
+
+const res = await fetch("/api/upload", { method: "POST", body: fd });
+const data = await res.json();
+// data.asset = { id, publicUrl, filename, mimeType, sizeBytes, width, height, alt, folderId }
+```
+
+source 自动归类：cover → 文章配图、product → 产品配图、editor → 文章配图、upload → 未分类。
+
+## 列表查询
+
+```ts
+const result = await listAssets({
+  siteId, folderId, search, sort: "createdAt", order: "desc", mimeType, page: 1, pageSize: 24,
+});
+// { ok, assets, total, page, pageSize }
+```
+
+## 删除/更新
+
+```ts
+await deleteAsset(assetId); // 自动清 DB + R2 原始文件
+await updateAssetMeta({ assetId, alt });  // 更新 alt 文本
+await updateAssetMeta({ assetId, folderId }); // 移动分组
+```
+
+## 文件夹 CRUD
+
+```ts
+const { folders } = await listFolders(siteId);
+const { folder } = await createFolder({ siteId, name: "新品发布" });
+await updateFolder({ folderId, name });
+await deleteFolder(folderId); // 素材自动移回未分类
+```
+
+## 图片缩放（Cloudflare Image Resizing）
+
+### URL 格式
+
+```
+原图：https://r2.inwindoverseas.com/sites/xxx/assets/uuid/uuid.png
+缩放：https://img.inwindoverseas.com/sites/xxx/assets/uuid/uuid.png?width=800&format=webp&quality=80
+```
+
+### 参数
+
+| 参数 | 说明 | 示例 |
+|---|---|---|
+| width | 宽度 | width=800 |
+| height | 高度 | height=600 |
+| quality | 质量 1-100 | quality=80 |
+| format | 输出格式 | format=avif / webp / auto |
+| fit | 裁剪 | fit=scale-down / cover / contain |
+
+### 代码中使用
+
+```ts
+import { getImageUrl, IMAGE_PRESETS } from "@inwind/shared/storage/image-url";
+
+const thumb = getImageUrl(asset.publicUrl, IMAGE_PRESETS.thumbnail); // 400px webp q75
+const card = getImageUrl(asset.publicUrl, IMAGE_PRESETS.card);       // 600px webp q80
+const hero = getImageUrl(asset.publicUrl, IMAGE_PRESETS.hero);       // 1200px webp q82
+
+// 自定义
+const custom = getImageUrl(asset.publicUrl, { width: 300, quality: 60, format: "avif" });
+```
+
+## 压缩效果参考
+
+| 版本 | 大小 | 压缩率 |
+|---|---|---|
+| 原图 PNG | 58,860B | — |
+| 400px + webp + q75 | 10,230B | -83% |
+| 800px + webp + q80 | 14,920B | -75% |
+| 400px + avif + q70 | 7,730B | -87% |

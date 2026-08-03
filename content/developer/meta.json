@@ -1,5 +1,13 @@
 {
   "title": "模板开发",
   "icon": "Blocks",
-  "pages": ["template-guide", "page-blocks", "api-reference"]
+  "pages": [
+    "template-guide",
+    "template-customization",
+    "page-blocks",
+    "locale-url",
+    "content-ingest",
+    "assets-api",
+    "api-reference"
+  ]
 }

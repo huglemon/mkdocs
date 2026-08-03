@@ -1,0 +1,72 @@
+---
+title: 模板内容入库
+description: 把模板静态内容自动写入后台页面块（AI 迁移器）。
+icon: Database
+---
+
+# 模板内容入库
+
+把客户模板分支的静态内容（文字/图片/列表/SEO）自动写入后台页面块，使前台内容后台可管。
+
+## 分工规范
+
+| 资产 | 存放位置 | 原因 |
+|---|---|---|
+| 入库脚本 | **SaaS**（apps/admin/scripts/） | 依赖数据库凭证，只在 SaaS 有库权限 |
+| 内容清单（manifest） | **客户分支**（template 仓库） | 数据契约跟模板代码同版本，可审计 |
+
+**安全红线**：客户模板仓库（部署到 Vercel 的站点）绝不持有数据库/admin 凭证，任何入库都从 SaaS 侧发起。
+
+**流程**：
+1. AI 扫描模板 → 生成内容清单（manifest JSON）
+2. manifest 提交到客户分支
+3. SaaS 读 manifest 入库
+4. 模板改版时对比 manifest 增删块
+
+## 运行方式
+
+```bash
+cd apps/admin
+npx tsx --env-file=.env scripts/upsert-site-blocks.ts --manifest <manifest.json> [--site <siteId>] [--locale <locale>]
+```
+
+- `--manifest`（必填）：manifest JSON 路径
+- `--site`（可选）：覆盖 manifest 里的 siteId
+- `--locale`（可选）：覆盖默认 zh-CN
+
+**幂等**：页面/块 upsert，导航先清后建，重复执行无副作用。
+
+## manifest 结构
+
+```json
+{
+  "siteId": "<站点 id>",
+  "locale": "zh-CN",
+  "pages": [
+    {
+      "slug": "home",
+      "title": "首页",
+      "pageType": "home",
+      "seo": { "metaTitle": "...", "keywords": "..." },
+      "blocks": [
+        { "slug": "hero-title", "type": "text", "name": "Hero 大标题", "data": { "text": "..." } }
+      ]
+    }
+  ],
+  "navigation": [
+    { "label": "首页", "type": "page", "pageSlug": "home" }
+  ]
+}
+```
+
+**块 type 收敛**：group / text / carousel / list。
+**slug 命名**：page-section-field。
+
+## 前台解析
+
+入库后的块由前台 getPage 拉取，用解析函数按 slug 取数（见「页面块调用与渲染」文档）。
+
+## 参考实现
+
+- SaaS 脚本：`apps/admin/scripts/upsert-site-blocks.ts`
+- 播种模式：`apps/admin/scripts/seed-home-blocks.ts`

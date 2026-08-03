@@ -1,0 +1,113 @@
+---
+title: 模板改造指南
+description: 把已有 Next.js 模板适配为 InWind 平台模板的完整流程。
+icon: Hammer
+---
+
+# 模板改造指南
+
+把「客户已有的 Next.js 模板」改造为符合 InWind 平台规范的模板，作为客户分支部署到该客户的 Vercel 站点。
+
+## 任务本质
+
+**把客户模板的「样式/布局」嫁接到平台骨架的「数据 + 路由 + 多语言」上。**
+
+- 平台骨架 = 数据层 + 路由骨架（**红线，不动**）
+- 客户模板 = 视觉层（**全部可替换**）
+- 产出 = 一个新分支，页面从 admin API 拉真实数据、用客户的设计渲染
+
+**判定标准（改完必须满足）**：
+1. 所有内容（产品/文章/导航/设置）来自 admin API，无写死数据
+2. 多语言路由正常工作（后台语言配置即时生效）
+3. ISR + revalidate 链路完整（改内容秒级生效）
+4. 每个文件保留 L3 头部注释格式
+5. 本地构建 + 开发通过
+
+## 环境准备
+
+```bash
+# 从模板仓库克隆（不是从 monorepo）
+git clone git@github.com:huglemon/inwind-site-template.git my-template
+cd my-template
+git checkout -b client-{slug}      # slug = 客户站标识
+
+# 安装依赖
+pnpm install
+
+# 配本地联调 env
+cp .env.example .env.local
+```
+
+`.env.local` 必须填：
+- `ADMIN_API_URL`：admin 平台域名
+- `SITE_ID`：该客户站 id
+- `SITE_SECRET`：该客户站 secret
+
+## 红线清单（这些文件绝不能动）
+
+| 文件 | 为什么不能动 |
+|---|---|
+| `lib/api-client.ts` | 全部取数函数与类型，客户数据契约的唯一来源 |
+| `lib/site-locale.ts` | 语言配置运行时拉取，支撑多语言 |
+| `middleware.ts` | 语言重定向（单语言 clean URL / 多语言前缀） |
+| `app/api/revalidate/route.ts` | ISR 即时失效端点 |
+| `components/inquiry/inquiry-form.tsx` | 询盘表单（字段名和 submitInquiry 调用必须保留） |
+| `app/[lang]/layout.tsx` 骨架结构 | generateStaticParams、导航取数、递归渲染 |
+| `app/[lang]/[slug]/page.tsx` | 通用页面路由（后台配置的页面块） |
+| 各页 `export const revalidate` | ISR 配置 |
+
+## 数据契约
+
+取数函数见 `lib/api-client.ts`。常用数据形状：Product、Post、SiteSettings、NavItem、SitePage。
+
+页面 ↔ 取数对照：
+- `[lang]/`（首页）：getSiteSettings + getProducts + getPosts
+- `[lang]/products`：getProducts
+- `[lang]/products/[slug]`：getProduct
+- `[lang]/news`：getPosts
+- `[lang]/news/[slug]`：getPost
+- `[lang]/[slug]`：getPage（后台配置的页面块）
+
+## 改造步骤
+
+### 1. 定视觉层
+把客户模板的布局/色板/字体/Hero/卡片/表单/动画提炼成 Tailwind 类 + 组件。
+
+### 2. 逐页替换 JSX（保留取数，换布局）
+对每个页面：保留取数调用和 revalidate，保留 params.lang 解构，替换 JSX 布局为你的设计。
+
+### 3. 全局样式
+`app/globals.css` 用 `@theme` 定义客户品牌色。
+
+### 4. 导航/页脚
+保留 getNavigation 取数和递归渲染，可换 header/footer 样式。
+
+### 5. 页面块渲染
+后台「页面数据」的块由 getPage 拉取，通用页面用 PageRenderer 自动渲染，定制页面手动取块。
+
+## 常见误区
+
+| 误区 | 后果 | 正确做法 |
+|---|---|---|
+| 产品/文章写死成静态数据 | 客户后台改内容不生效 | 必须 getProducts/getPosts 取数 |
+| 删掉 [lang] 动态路由 | 多语言/后台配置页全断 | 保留 app/lang 结构 |
+| 去掉 revalidate | ISR 失效 | 保留各页 export const revalidate |
+| 改 api-client 函数签名 | 数据契约破坏 | 原样保留，需要新字段找 admin 扩展 |
+| 删 inquiry-form 字段 | 询盘提交不匹配 | 保留字段名，只换样式 |
+
+## 验证
+
+```bash
+pnpm build
+pnpm dev --webpack   # Turbopack 卡死时用 webpack
+```
+
+## 静态内容后台化
+
+模板里硬编的静态内容（文案/图片/列表）可由 AI 迁移器自动入库后台页面块。详见「模板内容入库」文档。
+
+## 分支策略
+
+- `main` = 基础模板（通用能力与修复）
+- `client-{slug}` = 客户定制分支（从 main 分出）
+- 深度定制客户才开分支；普通客户改 logo/颜色/文案直接走后台配置
