@@ -33,13 +33,28 @@ const blocks = page?.blocks ?? [];
 
 ## 两种渲染模式
 
-### 模式 A：通用页面自动渲染
+### 模式 A：通用页面自动渲染（基线，全类型内置）
 
-`app/[lang]/[slug]/page.tsx` 的 `<PageRenderer>` 按块 type 自动渲染（text/html/carousel/gallery/json/form 内置）。后台配置的通用页面直接生效。
+`app/[lang]/[slug]/page.tsx` 的 `<PageRenderer>` 按块 type 自动渲染。**main 基线已内置全部后台块类型**：
+
+| type | 基线渲染 |
+|---|---|
+| text | heading + text |
+| single-image | 图片/alt/caption/link |
+| carousel / gallery | 图片集合（兼容 imageUrl 与旧 url 字段） |
+| list | columns/rows 语义化表格 |
+| html | 富文本 |
+| json | 安全 pre 兜底 |
+| post-list | 按当前 locale 调 getPosts 渲染卡片 |
+| product-list | 按当前 locale 调 getProducts 渲染卡片 |
+| form | 按当前 lang 拉取本地化表单字段 |
+| group | 后台组织容器，不输出 |
+
+后台新增普通页面（发布 + 未被静态路由占用）后**无需新增模板文件**，直接进入通用渲染。多语言行为见「多语言基线与 SEO」文档。
 
 ### 模式 B：定制页面按 slug 取数
 
-用 `blocks-to-marketing.ts` 的解析函数：
+需要品牌化首屏等定制设计时，用 `blocks-to-marketing.ts` 的解析函数：
 
 ```tsx
 import { toBlocksBySlug, getTextValue, getListRows, getCarouselFirst, getCtaList } from "@/components/client/home/blocks-to-marketing";

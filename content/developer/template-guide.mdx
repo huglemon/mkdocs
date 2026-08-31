@@ -22,14 +22,15 @@ icon: Blocks
 
 ## 多语言路由
 
-- 页面在 app/lang 下，lang 为语言参数
+- 页面在 app/[lang] 下，lang 为语言参数
 - 语言配置（默认/前台/多语言开关）由平台在后台配置
 - 单语言站 URL 无语言前缀（clean URL），多语言站带前缀
+- 语言切换、真实翻译路径、canonical/hreflang/sitemap 均为 main 内置基线，见「多语言基线与 SEO」文档
 
 ## 页面块渲染
 
 页面内容由后台「页面数据」的块组成。前台 getPage 拿 blocks 后按类型渲染：
-- 通用页面：page-renderer 自动按块类型渲染
+- 通用页面：page-renderer 自动按块类型渲染（main 基线已覆盖全部类型）
 - 定制页面：手动取特定块（见「页面块调用」文档）
 
 ## 环境变量

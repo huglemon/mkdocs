@@ -3,6 +3,7 @@
   "icon": "Blocks",
   "pages": [
     "template-guide",
+    "template-i18n-seo",
     "template-customization",
     "page-blocks",
     "locale-url",

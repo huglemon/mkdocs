@@ -1,0 +1,228 @@
+---
+title: 多语言基线与 SEO
+description: main 分支内置的运行时多语言、真实翻译路径、canonical/hreflang、sitemap/robots 基线 - 模板只做视觉，不重写这些轮子。
+icon: Globe
+---
+
+# 多语言基线与 SEO
+
+main 分支已内置完整的多语言与 SEO 基础设施。**新模板从 main 创建分支后，这些能力直接可用，不需要也不应该重写。** 模板分支的职责只剩下视觉设计。
+
+## 核心原则
+
+```
+后台是语言的唯一运行时来源
+模板只消费，不自己维护语言列表
+URL 语言 = 内容语言 = SEO 语言，三者由同一套配置驱动
+```
+
+## 语言配置从哪来
+
+后台「站点管理 -> 语言配置」保存：
+
+- 后台录入语言（defaultLocale，如 zh）
+- 前台默认语言（frontendLocale，如 en）
+- 启用语言列表（如 en/zh/de）
+- 多语言开关
+
+模板通过 `getSiteLocaleConfig()` 拉取 settings API，获得规范化后的配置：
+
+```ts
+const config = await getSiteLocaleConfig();
+// {
+//   defaultLocale: "zh",
+//   frontendLocale: "en",
+//   isMultilingual: true,
+//   locales: ["en", "zh", "de"],
+//   localeMeta: [
+//     { code: "en", name: "English", nativeName: "English", flag: "🇺🇸" },
+//     { code: "zh", name: "Chinese", nativeName: "中文", flag: "🇨🇳" },
+//     { code: "de", name: "German", nativeName: "Deutsch", flag: "🇩🇪" },
+//   ],
+// }
+```
+
+Admin API 不可达时自动回退到 env（`DEFAULT_LOCALE`/`LOCALES`），站点离线可用。
+
+模板做语言切换器时，用 `config.localeMeta` 渲染国旗、语言名、缩写 - 这些字段由后台返回，模板不自建映射表。
+
+## URL 规则
+
+| 站点类型 | URL 形态 |
+|---|---|
+| 多语言站 | `/en/about`、`/de/products/xxx` |
+| 单语言站 | `/about`、`/products/xxx`（clean URL，无前缀） |
+
+middleware 统一处理：
+- 多语言无前缀路径 redirect 到 frontendLocale
+- 单语言 clean URL 内部 rewrite 到 `/{frontendLocale}{path}`，地址栏不变
+- 未知语言（如 `/xx/about`）不会被拼进默认语言，由 `[lang]/layout.tsx` 的 locale guard 返回 404
+
+链接一律走 `lib/link.ts` 纯函数：
+
+```ts
+import { hrefLang, hrefHome } from "@/lib/link";
+
+hrefLang(lang, "/products", isMultilingual); // 多语言: /en/products；单语言: /products
+hrefHome(lang, isMultilingual); // 多语言: /en；单语言: /
+```
+
+## 语言切换器（内置组件）
+
+`components/nav/language-switcher.tsx` 已内置，放在 Header 即可：
+
+```tsx
+<LanguageSwitcher lang={lang} config={localeConfig} />
+```
+
+行为：
+- 单语言站自动隐藏
+- 下拉显示国旗 + 本地化语言名（来自 `config.localeMeta`）
+- 切换时保留当前 query string 和 hash
+- **产品/文章详情页切换使用后台真实翻译路径，不做字符串假替换**
+
+## 真实翻译路径（alternate routes）
+
+产品和文章支持每种语言独立 slug（翻译级 slug）。例如同一产品：
+
+```
+en: /en/products/multilingual-test-product
+zh: /zh/products/multilang-test-product
+de: /de/products/mehrsprachiges-testprodukt
+```
+
+后台 API：
+
+```
+GET /api/v1/pub/b2b/site/locale-routes?type=product&slug=xxx
+-> { routes: { en: "...", zh: "...", de: "..." }, frontendLocale: "en" }
+```
+
+模板封装为 `getLocaleRoutes(type, slug)`。**只在返回的 routes 里存在的语言才会出现在切换器和 hreflang 里** - 缺翻译的语言不会生成假 URL。
+
+## 固定 UI 文案（uiCopy）
+
+模板结构性文案（导航、空状态、面包屑、CTA、表单提示）统一走：
+
+```ts
+import { uiCopy } from "@/lib/ui-copy";
+
+uiCopy(lang, "products"); // en: "Products" / zh: "产品"
+uiCopy(lang, "articlesBy", { author: "Alice" }); // 支持变量插值
+```
+
+回退顺序：精确 locale -> 语言前缀（zh-CN -> zh）-> 英文。
+
+**不要把客户内容（公司名、营销文案、产品文章）塞进这个字典** - 那些属于后台内容。
+
+## 静态化与 ISR
+
+页面级 ISR 由各页面自己声明：
+
+```
+首页 / about / contact:     revalidate = 3600
+产品/新闻列表:               revalidate = 300
+产品/新闻详情:               revalidate = 3600
+通用 Page:                  revalidate = 300
+```
+
+后台内容变更后按 tag 主动失效（调用客户站 `/api/revalidate`，`X-Revalidate-Secret` 鉴权）：
+
+- 修改语言配置 / 站点设置 -> `site-settings`
+- 修改产品 -> `products`
+- 修改文章 -> `posts`
+- 修改页面块 -> `pages`
+
+根 layout 因为要按请求输出 `<html lang>`，声明了 `force-dynamic`；这是文档外壳的动态，不影响子页面各自的 ISR 缓存。
+
+## SEO 基线
+
+### html lang
+
+middleware 把解析出的 locale 写入请求头，root layout 输出：
+
+```html
+<html lang="en">   <!-- /en/... -->
+<html lang="zh">   <!-- /zh/... -->
+<html lang="de">   <!-- /de/... -->
+```
+
+### canonical + hreflang + x-default
+
+所有页面类型都有 `generateMetadata`：
+
+- 静态页（首页/about/contact/products/news 列表）：由 `staticPageMetadata()` 生成
+- 产品/文章/作者详情：由 `buildAlternates()` + 真实 locale routes 生成
+- 通用 Page：同上
+
+规则：
+
+```
+canonical    = 当前语言真实 URL（单语言为 clean URL）
+hreflang     = 只输出后台确认存在的语言版本
+x-default    = frontendLocale 的真实 URL
+后台填了 seo.canonical -> 只覆盖 canonical 字段，不删 hreflang
+```
+
+### sitemap.xml
+
+`app/sitemap.ts` 合并两个来源：
+
+```
+模板静态路径 registry（/、/about、/contact、/products、/news）
++ 后台 published-routes manifest（已发布产品/文章/作者/自定义 Page）
+```
+
+后台 manifest 已排除：draft、回收站、external Page、noindex、与静态路由冲突的 slug。
+
+### robots.txt
+
+```
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+Sitemap: https://站点域名/sitemap.xml
+```
+
+## 模板分支要做什么
+
+```
+✅ 替换视觉：颜色、字体、卡片、栅格、间距、轮播交互
+✅ 重新设计 Header/Footer 放置语言切换器的位置
+✅ 用 config.localeMeta 渲染自己的切换器样式（如需要）
+
+❌ 不要自己维护语言列表或 locale 映射表
+❌ 不要手拼 /${lang} 前缀（用 lib/link.ts）
+❌ 不要在切换详情页语言时字符串替换 slug（用 locale-routes）
+❌ 不要为静态页手写 canonical/hreflang（用 staticPageMetadata）
+❌ 不要把客户营销文案写进 ui-copy 字典
+```
+
+## 测试站验收
+
+多语言测试站（en/zh/de）已预置验收数据，用于验证基线是否被破坏：
+
+```
+/en/multilang-blocks
+/zh/multilang-blocks
+/de/multilang-blocks          <- 全类型页面块渲染 + 逐块回退
+
+/en/products/multilingual-test-product
+/zh/products/multilang-test-product
+/de/products/mehrsprachiges-testprodukt   <- 翻译级 slug + SEO
+
+/en/news/multilingual-test-article
+/zh/news/multilang-test-article
+/de/news/mehrsprachiger-testartikel      <- 翻译级 slug + SEO
+
+/sitemap.xml
+/robots.txt
+```
+
+验收要点：
+
+1. `<html lang>` 随 URL 语言变化
+2. 切换语言保留 query/hash，详情页跳真实翻译 slug
+3. 删除某个目标语言块后，该块自动回退默认语言，页面结构不缺失
+4. canonical/hreflang/x-default 不含假 URL，单语言站无 locale 前缀
+5. sitemap 只含真实公开 URL
