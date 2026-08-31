@@ -34,4 +34,19 @@ icon: Globe
 
 ## API 凭证
 
-显示站点密钥。前台 X-Site-Secret 请求公开 API 用。密钥敏感，妥善保管。
+站点详情页「API 凭证」展示两把运行时密钥：
+
+| 密钥 | 用途 | 浏览器可见 |
+|---|---|---|
+| SITE_SECRET | 前台请求公开 API 鉴权 | 是（NEXT_PUBLIC 前缀） |
+| REVALIDATE_SECRET | 前台 ISR 缓存失效鉴权 | 否（仅服务端） |
+
+两把密钥都支持：
+
+- 默认脱敏，点击显示/隐藏
+- 复制
+- 成对轮换
+
+轮换会同时生成新的 SITE_SECRET 和 REVALIDATE_SECRET，旧密钥立即失效，并同步到 Vercel env；重新部署后生产环境生效。
+
+> 注意：REVALIDATE_SECRET 是内部缓存控制凭证，用于后台改内容后通知前台刷新 ISR。它没有 NEXT_PUBLIC_ 前缀，浏览器 JavaScript 无法读取。

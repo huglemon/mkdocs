@@ -77,6 +77,42 @@ const formBlock = page?.blocks?.find((b) => b.type === "form" && b.data?.formSlu
 
 块 slug 按「page-section-field」模式：首页省略 page 前缀（hero-title），非首页带前缀（about-narrative-title）。每个 section 前置 group 容器块。
 
+## 多语言与逐块回退
+
+**PageBlock.slug 是跨语言回退的稳定身份。**
+
+默认语言提供页面结构基线，目标语言同 slug 的块覆盖默认语言，缺失的 slug 保留默认语言块：
+
+```text
+默认语言（zh）blocks:
+  intro / gallery / product-list / form
+
+目标语言（de）只有:
+  intro
+
+/de/... 实际渲染:
+  intro        → 德语版本
+  gallery      → 默认语言结构（图片等）
+  product-list → 用 de 调产品 API
+  form         → 用 de 调表单字段
+```
+
+这保证部分翻译的页面不会因少翻译一个块而整页缺结构。
+
+### 页面翻译会复制完整结构
+
+后台「翻译管理」翻译页面时，会复制**全部**默认语言 active 块到目标语言：
+
+- `text`：heading + text 翻译
+- `html`：HTML 文本翻译，保留标签
+- `single-image / carousel / gallery / list / json / form / post-list / product-list / group`：结构 + 配置原样复制，图片 URL、链接、表单 slug、列表查询参数保留
+
+目标语言块可再人工微调图片标题、列表文字等。
+
+### 动态列表块
+
+`post-list` / `product-list` 的配置（limit/categoryIds/sort/includeFeatured）跨语言共享；实际内容始终按当前 URL 语言查询后台 API。因此同一列表块在不同语言页面显示各自语言的标题、摘要与翻译 slug 链接。
+
 ## 参考实现
 
 - 解析函数：`components/client/home/blocks-to-marketing.ts`

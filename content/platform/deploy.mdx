@@ -15,7 +15,23 @@ icon: Cloud
 - 站点详情页「部署状态」查看进度，READY 后获得预览域名
 - 模板分支推送后，重新部署生效
 
-注入 env：ADMIN_API_URL、SITE_ID、SITE_SECRET、NEXT_PUBLIC 系列（语言/Umami/取数）。
+注入 env：ADMIN_API_URL、SITE_ID、SITE_SECRET、REVALIDATE_SECRET、NEXT_PUBLIC 系列（语言/Umami/取数）。
+
+## 部署隔离（重要）
+
+客户站点使用**显式部署**模式，而不是 Git 自动部署：
+
+- 客户 Vercel 项目已**关闭 Git Preview 自动部署**
+- 模板分支 push 不会自动触发所有项目 Preview
+- 正式发布只通过后台「部署状态」点击「用此分支重新部署」，携带：
+
+```text
+projectId + 客户分支 + target=production
+```
+
+这样可以保证每个站点只在自己的项目上发布，不会因为分支名相同而覆盖其他站点。
+
+> 模板仓库的 main 只是基线；每个站点使用独立的 `client-xxx` 分支，对应独立的 Vercel 项目。分支变更只是选择该站点项目的部署来源，不会切换项目。
 
 ## 自定义域名
 
