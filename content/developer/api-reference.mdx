@@ -1,64 +1,268 @@
 ---
 title: 公开 API 参考
-description: 前台站点调用的 admin 公开 API 端点与鉴权。
+description: 前台站点调用的 Admin 公开 API、认证、产品字段投影与响应约定。
 icon: Code
 ---
 
 # 公开 API 参考
 
-客户前台站点通过公开 API 从 admin 取数/提交。所有端点带 X-Site-Id / X-Site-Secret 请求头鉴权。
+客户前台站点通过公开 API 从 Admin 获取内容和提交询盘。所有受保护端点都带 `X-Site-Id` / `X-Site-Secret` 请求头鉴权。
 
 ## 鉴权
 
-```
-X-Site-Id: <站点 id>
+```text
+X-Site-Id: <站点 ID>
 X-Site-Secret: <站点密钥>
 ```
 
-站点密钥在后台站点详情页「API 凭证」获取。校验失败返回 401/403。
+站点密钥在后台站点详情页的「API 凭证」获取。缺少认证信息返回 `401`；密钥不匹配或站点未启用返回 `403`。
+
+## 时间与语言
+
+- API 时间点始终返回 ISO 8601 UTC instant，例如 `2026-09-04T01:00:00.000Z`。
+- 前端按自身展示策略格式化时间；不要将 API 时间点当作无时区文本解析。
+- 内容接口使用 `locale` 选择语言。无效或未启用的前台语言会回退到站点 `frontendLocale`。
+- 产品字段按以下优先级解析：
+
+```text
+请求语言翻译 → 默认语言翻译 → 产品主字段
+```
 
 ## 端点清单
 
-### 站点设置
+| 接口 | 方法 | 用途 |
+|---|---|---|
+| `site/settings` | GET | 站点公开设置和语言配置 |
+| `site/navigation` | POST | 导航树 |
+| `pages/:slug` | GET | 页面、内容块和 SEO |
+| `content/products` | POST | 产品集合 |
+| `content/products/:slug` | GET | 完整产品详情 |
+| `content/posts` | POST | 文章集合 |
+| `content/posts/:slug` | GET | 文章详情 |
+| `content/authors/:slug` | GET | 作者与文章 |
+| `forms/:slug` | GET | 动态表单定义 |
+| `inquiry` | POST | 提交询盘 |
 
-GET /api/v1/pub/b2b/site/settings — 公司信息 + 语言配置。
+---
 
-### 导航
+## 产品集合
 
-POST /api/v1/pub/b2b/site/navigation（body 传 locale）— 导航树。
+```text
+POST /api/v1/pub/b2b/content/products
+```
 
-### 页面
+### 默认轻量响应
 
-GET /api/v1/pub/b2b/pages/页面slug?locale= — 页面 + 页面块。
+不传 `include` 与 `response` 时，接口保持兼容的轻量裸数组，适合产品卡片、首页推荐和动态产品列表：
 
-### 内容
+```json
+[
+  {
+    "id": "product_1",
+    "title": "产品标题",
+    "slug": "product-slug",
+    "summary": "产品摘要",
+    "mainImageUrl": "https://cdn.example.com/product.jpg",
+    "publishedAt": "2026-09-04T01:00:00.000Z"
+  }
+]
+```
 
-- POST /api/v1/pub/b2b/content/products — 产品列表
-- GET /api/v1/pub/b2b/content/products/产品slug — 产品详情
-- POST /api/v1/pub/b2b/content/posts — 文章列表
-- GET /api/v1/pub/b2b/content/posts/文章slug — 文章详情
-- GET /api/v1/pub/b2b/content/authors/作者slug — 作者 + 文章
+### 请求参数
 
-### 表单
+```json
+{
+  "locale": "en",
+  "page": 1,
+  "limit": 20,
+  "categoryIds": ["category_1"],
+  "categorySlugs": ["charcoal"],
+  "sort": "weight",
+  "includeFeatured": true,
+  "include": ["gallery", "content", "properties", "categories", "tags"],
+  "response": "envelope"
+}
+```
 
-GET /api/v1/pub/b2b/forms/表单slug — 表单字段定义，前台动态渲染。
+| 字段 | 类型 | 默认值 | 说明 |
+|---|---|---:|---|
+| `locale` | string | 站点前台语言 | 目标语言 |
+| `page` | number | `1` | 页码，最小 `1` |
+| `limit` | number | `20` | 每页数量，范围 `1–100` |
+| `categoryIds` | string[] | `[]` | 当前站点产品分类 ID 筛选 |
+| `categorySlugs` | string[] | `[]` | 当前站点产品分类 slug 筛选 |
+| `categorySlug` | string | — | 兼容旧版单分类 slug |
+| `sort` | string | `weight` | `newest` / `oldest` / `popular` / `weight` |
+| `includeFeatured` | boolean | `true` | 是否将置顶产品优先排序 |
+| `include` | string[] | `[]` | 显式请求扩展字段 |
+| `response` | string | — | 传 `envelope` 返回分页与语言元信息 |
 
-### 询盘
+### `include` 白名单
 
-POST /api/v1/pub/b2b/inquiry — 提交询盘。body：formTemplateId、token、fields、utm、path。
+集合接口只允许请求预定义的功能块，不能任意选择数据库字段：
 
-- 按表单字段动态校验，返回逐字段错误
-- 防重复：同 IP + 同内容 60 秒内重复提交返回 409
-- 采集 IP/UA/Referrer/UTM 入库
+| token | 追加字段 |
+|---|---|
+| `gallery` | `galleryImages` |
+| `content` | `contentHtml` |
+| `properties` | `propertiesJson` |
+| `categories` | `categories` |
+| `tags` | `tags` |
 
-### 素材
+未知 token、`all`、`*`、负向字段或非字符串数组会返回：
 
-GET /api/v1/pub/b2b/content/assets — 站点素材。
+```json
+{
+  "error": "include 参数无效",
+  "code": "INVALID_INCLUDE"
+}
+```
 
-## 数据缓存
+未请求的扩展字段不会出现。这样列表不会因为一个卡片请求而默认加载全部正文、图册和 taxonomy。
 
-GET 请求支持 next.tags（ISR on-demand 失效）。前台用 tag 关联缓存，admin 改内容后即时刷新。
+### 请求扩展字段示例
+
+```json
+{
+  "locale": "en",
+  "include": ["gallery", "categories", "tags"],
+  "response": "envelope"
+}
+```
+
+单个产品可能追加：
+
+```json
+{
+  "galleryImages": [
+    {
+      "id": "asset_2",
+      "url": "https://cdn.example.com/product-2.jpg",
+      "alt": "产品侧面",
+      "title": "产品侧面",
+      "width": 1200,
+      "height": 900
+    }
+  ],
+  "categories": [
+    { "id": "category_1", "name": "木炭", "slug": "charcoal" }
+  ],
+  "tags": [
+    { "id": "tag_1", "name": "快速燃烧", "slug": "quick-light" }
+  ]
+}
+```
+
+### `response: "envelope"`
+
+为新模板提供真实分页和语言状态，但不破坏旧模板的裸数组契约：
+
+```json
+{
+  "data": [
+    {
+      "id": "product_1",
+      "title": "产品标题",
+      "slug": "product-slug",
+      "summary": "产品摘要",
+      "mainImageUrl": null,
+      "publishedAt": "2026-09-04T01:00:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 20,
+    "total": 138,
+    "totalPages": 7,
+    "hasNext": true,
+    "hasPrevious": false
+  },
+  "meta": {
+    "requestedLocale": "en",
+    "effectiveLocale": "en",
+    "defaultLocale": "zh",
+    "fallbackUsed": false
+  }
+}
+```
+
+现有模板若不传 `response`，继续按数组消费即可；新模板可以主动请求 `response: "envelope"`，不再用大 limit 猜测总页数。
+
+---
+
+## 产品详情
+
+```text
+GET /api/v1/pub/b2b/content/products/:slug?locale=en
+```
+
+详情接口默认返回完整公开产品视图：
+
+```json
+{
+  "id": "product_1",
+  "locale": "en",
+  "contentLocale": "en",
+  "fallbackToDefault": false,
+  "title": "产品标题",
+  "slug": "product-slug",
+  "summary": "产品摘要",
+  "contentHtml": "<p>产品正文</p>",
+  "mainImageUrl": "https://cdn.example.com/product.jpg",
+  "galleryImages": [
+    {
+      "id": "asset_2",
+      "url": "https://cdn.example.com/product-2.jpg",
+      "alt": "产品侧面",
+      "title": null,
+      "width": 1200,
+      "height": 900
+    }
+  ],
+  "propertiesJson": {
+    "diameter": "33mm"
+  },
+  "categories": [
+    { "id": "category_1", "name": "木炭", "slug": "charcoal" }
+  ],
+  "tags": [
+    { "id": "tag_1", "name": "快速燃烧", "slug": "quick-light" }
+  ],
+  "isFeatured": false,
+  "publishedAt": "2026-09-04T01:00:00.000Z",
+  "seo": null
+}
+```
+
+说明：
+
+- `mainImageUrl` 保留用于兼容现有模板。
+- `galleryImages` 严格按 CMS 保存的图册顺序返回；主图不会自动插入图册。
+- `categories` 与 `tags` 始终为数组。
+- `contentLocale` 表示正文实际来源语言；`fallbackToDefault` 表示当前请求使用了默认语言回退。
+- 只返回当前站点、`published` 且未软删除的产品；草稿、归档和回收站产品返回 `404`。
+- 主图和图册素材必须属于当前站点且状态为 `active`；失效或跨站点素材会被省略，不会让整个产品请求失败。
+- 命中详情后会异步增加浏览量，不阻塞响应。
+
+---
+
+## 文章、页面与其他资源
+
+当前文章集合和详情、页面、导航、表单仍保持既有 v1 契约。后续会按产品同一原则逐步支持：默认轻量集合、白名单 `include`、完整详情、显式 locale fallback 和安全资源投影。
+
+## 缓存
+
+- `GET` 详情接口可结合 ISR/缓存策略。
+- `POST` 集合接口通常不进入 Next Data Cache；前台列表页使用 ISR 和内容标签失效。
+- 内容更新后由 Admin 触发对应内容标签失效。
 
 ## 错误格式
 
-非 2xx 返回 error 字段（中文提示），校验类返回 error + errors 数组。
+非 2xx 响应包含 `error` 字段。参数校验类错误可能附带稳定错误码，例如：
+
+```json
+{
+  "error": "include 参数无效",
+  "code": "INVALID_INCLUDE"
+}
+```
