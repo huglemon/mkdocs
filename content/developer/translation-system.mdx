@@ -37,7 +37,7 @@ icon: Languages
 | `single-image` | `alt`、`caption` |
 | `carousel` | 每个 item 的 `alt`、`title` |
 | `gallery` | `title` + 每个 item 的 `title` |
-| `list` | 每一列的 `label` + 各**文本列**（`text`/`textarea`）单元格 |
+| `list` | 每一列的 `label` + 各**文本列**（`text`/`textarea`）单元格；**无 `columns` 元数据时**按自然语言启发式兜底收集字符串叶子（跳过 URL / 纯数字 / 图标名） |
 | `html` | HTML 文本（**保留标签**） |
 | `json` | 递归翻译其中像自然语言的字符串（跳过 URL / 纯数字） |
 | `post-list` / `product-list` / `group` / `form` | 不含用户文本：仅复制结构/配置 |
@@ -64,10 +64,14 @@ metaTitle / metaDescription / keywords[] / ogTitle / ogDescription
 翻译走 `AiTask`（数据库租约 + 心跳防双执行）：
 
 - 后台每个内容类型的操作里点「**翻译到所有语言**」→ **确认框** → 生成后台任务并**立即返回**；
-- 页面显示**进度条**，**可离开页面**，任务在 Worker 里继续；
-- 终态如实记录：`completed` / `partial`（部分成功）/ `failed`，并区分 **保存 / 跳过 / 失败 / 缺失** 计数。
+- 进度**就在确认弹窗内**（标注「AI 翻译」），**可关闭窗口**，任务在 Worker 里继续；弹窗内有「**强制停止**」；
+- 终态如实记录：`completed` / `partial`（部分成功）/ `failed` / `cancelled`（手动停止），并区分 **保存 / 跳过 / 失败 / 缺失** 计数；
+- **中断自动回收**：心跳停止超过 90 秒的 running 任务自动判 `failed`（「任务中断（心跳超时，已自动停止）」）；
+- **写入用批量事务 + 显式放宽超时**：大页面（30+ 块）此前在默认 5s 交互事务里逐个 upsert 会超时回滚、导致整语言失败；现改为批量提交 + 30s 超时。
 
 **手动保护（文章/产品）**：标记为 `source = manual` 的翻译不会被自动覆盖；需要覆盖时用「**全部重翻（含手动）**」。
+
+> 翻译任务**不出现在「AI 任务」页**（该页只留文章生成等其它任务），进度统一在触发它的弹窗内呈现。
 
 ## 完整性判定与「再翻一次即补翻」
 

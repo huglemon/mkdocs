@@ -30,6 +30,15 @@ icon: ListOrdered
 
 > 产品与新闻**完全对称**：main 里两者是同一套模式的两份实例，改动其一请同步另一个。
 
+标签页（按标签过滤，无分类维度）：
+
+| 内容 | 第 1 页 | 第 N 页 |
+|---|---|---|
+| 产品标签 | `/products/tag/<slug>` | `/products/tag/<slug>/page/N` |
+| 新闻标签 | `/news/tag/<slug>` | `/news/tag/<slug>/page/N` |
+
+> 标签页取数走列表接口的 `tagSlugs` 过滤（见「公开 API 参考」的「标签」）。分页基路径由 `ContentListingPage` 的 `basePath` 覆盖为 `/products/tag/<slug>`（yimu 等有视觉层的分支）。
+
 ## 旧 query → canonical：middleware 308
 
 `middleware.ts` 把旧式 query 分页永久重定向到路径分页（保留其它 query）：

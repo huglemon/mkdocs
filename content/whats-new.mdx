@@ -8,15 +8,32 @@ icon: Sparkles
 
 本页汇总 **2026-09-04 之后** 平台（CMS + 模板）上线的能力。每条给出「做了什么修改」和细节文档入口。
 
+## 站点地图与标签（2026-09-18）
+
+- **sitemap 改为全量输出（修复「sitemap 几乎没用」）**：模板 `app/sitemap.ts` 改为「静态路径 + CMS 全量路由清单」，覆盖**每个启用语言**下的**页面 / 产品 / 产品分类 / 文章 / 文章分类 / 产品标签 / 文章标签 / 作者**。产品/文章取「该语言翻译 slug，否则回退本 slug」；分类/标签 slug 语言稳定。此前只有 5 条静态路径、产品只有默认语言，还混入了不该出现的 `/home`——这些均已根治。
+- **新增公开端点 `site/sitemap`**：一次性返回上述全量公开路径（按语言）。过滤 draft / 回收站 / 外链 / noindex，页面排除 `pageType=home` 与保留 slug（`about`/`contact`/`products`/`news`/`authors`/`home`）。
+- **标签能力补全**：新增公开 `content/tags?type=post|product`（返回本地化名称）；列表接口 `content/posts`、`content/products` 支持 `tagSlugs`/`tagIds` 过滤；模板新增标签页路由 `/{lang}/products/tag/{tag}`、`/{lang}/news/tag/{tag}`（含分页）。
+- **站点图标**：模板 `app/icon.png` 由 Next 图标文件约定自动接入 favicon，无需改 layout。
+- 细节：「多语言基线与 SEO」「列表分页与静态化」「公开 API 参考」
+
+## 构建与部署性能（2026-09-18）
+
+- **函数区域固定香港 `hkg1`（最大提速）**：CMS 与模板此前都跑在 Vercel 默认区域 `iad1`（美东），而自建 PostgreSQL 在香港——**每次查询跨太平洋往返**。同区后单次调用延迟降一个数量级，**客户站点构建 8m27s → 1m18s**，线上请求一并受益。
+- **预渲染上限按类型拆分**：`STATIC_PRERENDER_PRODUCTS_LIMIT`（默认 **50**）/ `STATIC_PRERENDER_NEWS_LIMIT`（默认 **20**），超出的长尾走按需 ISR——构建时间**不随内容量线性膨胀**（3000 个产品不会变成 3000 次构建期渲染）。
+- **页面全量预渲染（护转化红线）**：后台「页面管理」里的**所有已发布页面**（× 每个语言）无条件预渲染、由 CDN 直出，保证首页 / 导航目标 / 广告落地页「一点即达」；产品与文章仍只预渲染 top-N。
+- 细节：「部署与域名」
+
 ## 列表与分页
 
 - **改为 canonical 路径分页**：产品/新闻列表从 `?page=` 改为 `/products/page/N`、`/products/category/<slug>/page/N`（新闻对称）。每个页码独立可索引。
 - **旧 query 308 迁移**：middleware 把 `/products?page=N`、`/news?category=&page=` 永久重定向到路径分页。
+- **标签页**：`/{lang}/products/tag/<slug>`、`/{lang}/news/tag/<slug>`，分页形态同上（`/tag/<slug>/page/N`）。
 - **构建期取数重写（修复构建卡死）**：静态参数改为「按分页信封读总页数 + 进程内记忆化 + 有界并发」，替代原先逐条串行 `limit:1000` 全量拉取——后者会让构建 `Collecting page data` 阶段卡住几十分钟。
 - 细节：「列表分页与静态化」
 
 ## SEO 与结构化数据
 
+- **分类页 / 分页页 TDK 合成**：`/products/category/<x>`、`/news/category/<x>` 及其分页页此前**没有 TDK**（回退到站点名）；现按「分类名 | 站点名（· 页码）」合成标题，`description` 取基础列表页 CMS SEO，canonical/hreflang 沿该页路径。
 - **每页 `<html lang>`、canonical、per-page SEO**：`middleware` 解析 locale → root layout 输出 `<html lang>`；静态页与详情页各自的 `generateMetadata`。
 - **列表页 TDK 改读后台**：`/`、`/products`、`/news`、`/about`、`/contact` 的标题/描述从后台页面 SEO 读取（`pageMetadata`），不再用模板内置文案。
 - **自动生成 JSON-LD**：站点级 `Organization`/`WebSite` + 文章 `Article` / 产品 `Product` / `BreadcrumbList`。
@@ -25,6 +42,10 @@ icon: Sparkles
 
 ## 内容翻译
 
+- **修复：`list` 块无 `columns` 时漏翻**：部分列表块（如 FAQ）数据里没有列元数据，此前**收集为空 → 原样复制**（表现为「FAQ 块没翻译」）；现按自然语言启发式兜底收集（自动跳过 URL / 纯数字 / 图标名）。
+- **修复：页面翻译写入超时**：大页面（30+ 块）此前在默认 **5s 交互事务**里逐个 upsert，远端库下超时回滚 → **整个语言失败**；现改批量事务并显式放宽到 30s。
+- **修复：任务卡在「执行中」**：Worker 中途中断后任务**永远 running、无法停止**；现新增**手动强制停止**（清租约，运行中的 worker 下一次心跳即失效停写）与**陈旧任务自动判失败**（心跳超 90s 自动回收，翻译页与任务轮询触发）；内联兜底执行带整批时间预算，到点落 partial/failed 而非被静默 kill。
+- **进度归位**：翻译进度**移入翻译确认弹窗**（含「强制停止」按钮），AI 任务页**不再显示翻译任务**。
 - **翻译覆盖全类型页面块文本**：`list`（列名 + 文本列单元格）、`carousel`/`gallery`（alt/title）、`single-image`（alt/caption）、`json`（递归自然语言字符串）等**都翻**——早期版本对非 `text`/`html` 块是**原样复制**。
 - **SEO 关键词参与翻译**：`keywords` 数组与 `metaTitle`/`metaDescription`/`ogTitle`/`ogDescription` 一并翻译。
 - **文章/产品 SEO 落库**：翻译后写入目标语言的 `seoJson`（此前完全不写）。
@@ -36,22 +57,27 @@ icon: Sparkles
 
 ## 公开 API
 
+- **`site/sitemap`（新）**：全量公开路径清单（页面/产品/分类/文章/标签/作者 × 每个语言），供模板生成 sitemap。
+- **`content/tags`（新）**：标签列表（本地化名称，按 `type`）。
+- **列表 tag 过滤**：`content/posts`、`content/products` 支持 `tagSlugs`/`tagIds`。
 - **文章列表分页信封**：`content/posts` 支持 `response: "envelope"`（`pagination` + 语言元信息），与产品同构。
-- **分类树接口**：`content/categories?type=post|product&locale=xx` 返回**分类树**（roots + 递归 children），`name` 按 `locale` 本地化。
+- **分类树接口**：`content/categories?type=post|product&locale=xx` 返回**分类树**（roots + 递归 children），`name` 按 `locale` 本地化；可选 `parentId`（取该分类的子孙）与 `depth`（限制层数）。
 - **预渲染端点**：`site/published-routes`、`site/locale-routes` 供模板生成静态路由与真实翻译路径切换。
 - 细节：「公开 API 参考」
 
 ## 平台后台与权限
 
+- **模型连通测试按用途分流**：平台「测试」按钮此前**对任何用途都调 chat 接口**，image 用途的模型必然报 400；现 image 走生图端点探针（`{base}/images/generations`，其余仍走 chat）。注意：image 测试会真实生成 1 张最小测试图。
 - **Scoped RBAC**：角色/权限/资源范围化，成员按站点与功能授权；CMS 导航与控件按「有效能力」裁剪（无写权限时隐藏/置灰）。
 - **分类/标签翻译入口**：后台分类/标签管理新增「翻译到所有语言」（确认 + 进度）。
 
 ## 平台运维
 
 - **Prisma 连接池收紧**：每 serverless 实例连接数上限由 10 降到 2，空闲连接 30s 回收，避免共享 PostgreSQL 连接被打满导致全站 500 / 构建期取数卡死。根治仍建议加连接池（PgBouncer）。
+- **函数区域固定 `hkg1`**：见上「构建与部署性能」——与自建 PG（香港）同区。
 
 ## 从哪里看
 
 - 客户使用：「客户使用指南」各篇。
 - 模板开发（新项目）：「模板开发规范」「列表分页与静态化」「内容翻译体系」「结构化数据与站点 logo」「多语言基线与 SEO」「公开 API 参考」。
-- 平台后台：「平台后台手册」各篇（含「后台翻译操作」）。
+- 平台后台：「平台后台手册」各篇（含「后台翻译操作」「部署与域名」）。

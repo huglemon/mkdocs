@@ -171,11 +171,18 @@ x-default    = frontendLocale 的真实 URL
 `app/sitemap.ts` 合并两个来源：
 
 ```
-模板静态路径 registry（/、/about、/contact、/products、/news）
-+ 后台 published-routes manifest（已发布产品/文章/作者/自定义 Page）
+模板静态路径 registry（/、/about、/contact、/products、/news）× 每个启用语言
++ 后台 site/sitemap 全量路由清单
 ```
 
-后台 manifest 已排除：draft、回收站、external Page、noindex、与静态路由冲突的 slug。
+后台清单覆盖**每个启用语言**下的：页面 / 产品 / 产品分类 / 文章 / 文章分类 / 产品标签 / 文章标签 / 作者。
+
+- **产品 / 文章**：取「该语言的翻译 slug，否则回退该资源的本 slug」——保证每个语言都出 URL，不因缺翻译而整条漏掉。
+- **分类 / 标签 / 页面 / 作者**：slug 跨语言稳定，各语言同 slug。
+- **单语言站**：输出 clean URL；多语言站：`/{locale}/...`。
+- 已排除：draft、回收站、外链（external）页面、`noindex`、首页（`pageType=home` 或保留 slug，避免多余的 `/home`）。
+
+> 后台「页面管理」里的**所有已发布页面**都会在**构建期预渲染**（不设上限，由 CDN 直出，保证首页/导航/落地页一点即达）；产品与文章只预渲染 top-N（`STATIC_PRERENDER_PRODUCTS_LIMIT` 默认 50 / `STATIC_PRERENDER_NEWS_LIMIT` 默认 20），长尾走按需 ISR。细节见「部署与域名」。
 
 ### robots.txt
 

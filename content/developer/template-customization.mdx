@@ -95,6 +95,12 @@ cp .env.example .env.local
 | 改 api-client 函数签名 | 数据契约破坏 | 原样保留，需要新字段找 admin 扩展 |
 | 删 inquiry-form 字段 | 询盘提交不匹配 | 保留字段名，只换样式 |
 
+## 站点图标（favicon）
+
+把图标 PNG 放到 `app/icon.png`——Next.js 的**图标文件约定**会自动生成 `<link rel="icon" type="image/png">`，**无需改 layout**。各客户分支放各自的图标即可（本仓库示例为 128×128 PNG）。
+
+> 若还要兼容直接请求 `/favicon.ico` 的旧爬虫，可另放一枚**真正的 ICO** 到 `app/favicon.ico`——注意 Next 的 `favicon.ico` 约定要求真实 ICO 格式，**不能仅改扩展名**。
+
 ## 验证
 
 ```bash

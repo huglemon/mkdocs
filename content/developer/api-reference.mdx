@@ -34,7 +34,8 @@ X-Site-Secret: <站点密钥>
 |---|---|---|
 | `site/settings` | GET | 站点公开设置、语言配置与 logo |
 | `site/navigation` | POST | 导航树 |
-| `site/published-routes` | GET | 已发布内容清单（sitemap / 静态参数） |
+| `site/published-routes` | GET | 已发布内容清单（静态参数与旧版路由） |
+| `site/sitemap` | GET | 全量公开路径清单（页面/产品/分类/文章/标签/作者 × 每个语言），供模板生成 sitemap |
 | `site/locale-routes` | GET | 单个资源的真实翻译路径（语言切换） |
 | `pages/:slug` | GET | 页面、内容块和 SEO |
 | `content/products` | POST | 产品集合（可选分页信封） |
@@ -42,6 +43,7 @@ X-Site-Secret: <站点密钥>
 | `content/posts` | POST | 文章集合（可选分页信封） |
 | `content/posts/:slug` | GET | 文章详情 |
 | `content/categories` | GET | 分类树（本地化名称；可选 `parentId`/`depth` 取子树或限层） |
+| `content/tags` | GET | 标签列表（本地化名称；按 `type=post\|product`） |
 | `content/authors/:slug` | GET | 作者与文章 |
 | `forms/:slug` | GET | 动态表单定义 |
 | `inquiry` | POST | 提交询盘 |
@@ -325,14 +327,44 @@ GET /api/v1/pub/b2b/content/categories?type=product&parentId=c1
 -> 返回 c1 的子孙（c1 自身不返回），递归到叶子
 ```
 
+## 标签
+
+```text
+GET /api/v1/pub/b2b/content/tags?type=post|product&locale=xx
+```
+
+返回标签**扁平列表**（无层级）：
+
+```json
+[ { "id": "tag_1", "name": "速燃木炭", "slug": "quick-light" } ]
+```
+
+- `name` 按 `locale` **本地化**（`locale` 译文 → 默认语言译文 → 主表基名）；`slug` 跨语言稳定。
+- 列表接口 `content/posts` / `content/products` 支持**按标签过滤**：请求体传 `tagSlugs: ["quick-light"]`（或 `tagIds: ["tag_1"]`），与 `categorySlug(s)` 并列。
+- 模板据此提供标签页 `/{lang}/products/tag/<slug>`、`/{lang}/news/tag/<slug>`。
+
 ## 预渲染端点
 
-供前台生成静态路由与真实翻译路径切换：
+供前台生成静态路由、sitemap 与真实翻译路径切换：
 
 | 接口 | 方法 | 用途 |
 |---|---|---|
-| `site/published-routes` | GET | 已发布内容清单（每条含 `type` / 各语言 `routes` / `lastModified`），sitemap 与静态参数用 |
+| `site/sitemap` | GET | **全量公开路径清单**（见下），模板 `app/sitemap.ts` 用 |
+| `site/published-routes` | GET | 已发布内容清单（每条含 `type` / 各语言 `routes` / `lastModified`），静态参数与旧版路由用 |
 | `site/locale-routes` | GET | 单个资源的**真实翻译路径**：`?type=product\|post\|author\|page&slug=xxx` → `{ routes: { en, zh, ... }, frontendLocale }`，语言切换器用 |
+
+### `site/sitemap`
+
+```text
+GET /api/v1/pub/b2b/site/sitemap
+-> { "routes": [ { "type": "product", "routes": { "en": "/en/products/xxx", "zh": "/zh/products/xxx" }, "lastModified": "..." }, ... ] }
+```
+
+- 覆盖**每个启用语言**下的 `page | product | product-category | post | post-category | product-tag | post-tag | author`。
+- 产品/文章取「该语言翻译 slug，否则回退本 slug」；分类/标签/页面/作者 slug 跨语言稳定。
+- 路径为 **internal locale 前缀**（多语言 `/{locale}/...`，单语言 clean），模板再用 `canonicalizePublicPath` 转唯一 public code。
+- 过滤 draft / 回收站 / 外链 / `noindex`；页面排除 `pageType=home` 与保留 slug（`about`/`contact`/`products`/`news`/`authors`/`home`）。
+- 分类/标签无 `updatedAt`，其 `lastModified` 省略。
 
 ## 其余资源
 
