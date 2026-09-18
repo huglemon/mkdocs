@@ -41,7 +41,7 @@ X-Site-Secret: <站点密钥>
 | `content/products/:slug` | GET | 完整产品详情 |
 | `content/posts` | POST | 文章集合（可选分页信封） |
 | `content/posts/:slug` | GET | 文章详情 |
-| `content/categories` | GET | 分类树（按 locale 本地化名称） |
+| `content/categories` | GET | 分类树（本地化名称；可选 `parentId`/`depth` 取子树或限层） |
 | `content/authors/:slug` | GET | 作者与文章 |
 | `forms/:slug` | GET | 动态表单定义 |
 | `inquiry` | POST | 提交询盘 |
@@ -280,7 +280,7 @@ POST /api/v1/pub/b2b/content/posts
 ## 分类树
 
 ```text
-GET /api/v1/pub/b2b/content/categories?type=post|product&locale=xx
+GET /api/v1/pub/b2b/content/categories?type=post|product&locale=xx&parentId=<id>&depth=N
 ```
 
 返回**分类树**（根节点数组，子节点递归挂在 `children`），供前台层级侧边栏与 canonical 分类路由消费：
@@ -296,8 +296,34 @@ GET /api/v1/pub/b2b/content/categories?type=post|product&locale=xx
 ]
 ```
 
-- `name` 按 `locale` **本地化**：`locale` 译文 → 默认语言译文 → 主表基名；
-- `slug` **不本地化**，跨语言稳定（因此 `/products/category/<slug>` 在多语言下是同一路径）。
+### 查询参数
+
+| 参数 | 必填 | 说明 |
+|---|---|---|
+| `type` | 是 | `post` / `product` |
+| `locale` | 否 | 目标语言；缺省站点前台语言。**仅影响 `name`**（本地化） |
+| `parentId` | 否 | 只返回**该分类的子孙**（不含该节点自身）。省略 = 返回所有根节点 |
+| `depth` | 否 | 只展开 **N 层**（`1` = 只返回直接子级，其 `children` 为空）。省略 = 不限深度 |
+
+规则：
+
+- `name` 按 `locale` **本地化**（`locale` 译文 → 默认语言译文 → 主表基名）；
+- `slug` **不本地化**，跨语言稳定（因此 `/products/category/<slug>` 在多语言下是同一路径）；
+- `parentId` 必须属于**当前站点 + 同 type**，否则返回 `400`；`depth` 非正整数返回 `400`。
+
+### 只取某分类的直接子级
+
+```text
+GET /api/v1/pub/b2b/content/categories?type=product&locale=en&parentId=c1&depth=1
+-> [ { "id": "c2", ..., "children": [] }, { "id": "c3", ..., "children": [] } ]
+```
+
+### 从某分类起整棵子树（不限深度）
+
+```text
+GET /api/v1/pub/b2b/content/categories?type=product&parentId=c1
+-> 返回 c1 的子孙（c1 自身不返回），递归到叶子
+```
 
 ## 预渲染端点
 
