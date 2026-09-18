@@ -1,0 +1,57 @@
+---
+title: 最近新特性与变更
+description: 2026-09 以来 CMS 与模板上线的能力总览——做了什么修改、影响什么、去哪看细节。
+icon: Sparkles
+---
+
+# 最近新特性与变更
+
+本页汇总 **2026-09-04 之后** 平台（CMS + 模板）上线的能力。每条给出「做了什么修改」和细节文档入口。
+
+## 列表与分页
+
+- **改为 canonical 路径分页**：产品/新闻列表从 `?page=` 改为 `/products/page/N`、`/products/category/<slug>/page/N`（新闻对称）。每个页码独立可索引。
+- **旧 query 308 迁移**：middleware 把 `/products?page=N`、`/news?category=&page=` 永久重定向到路径分页。
+- **构建期取数重写（修复构建卡死）**：静态参数改为「按分页信封读总页数 + 进程内记忆化 + 有界并发」，替代原先逐条串行 `limit:1000` 全量拉取——后者会让构建 `Collecting page data` 阶段卡住几十分钟。
+- 细节：「列表分页与静态化」
+
+## SEO 与结构化数据
+
+- **每页 `<html lang>`、canonical、per-page SEO**：`middleware` 解析 locale → root layout 输出 `<html lang>`；静态页与详情页各自的 `generateMetadata`。
+- **列表页 TDK 改读后台**：`/`、`/products`、`/news`、`/about`、`/contact` 的标题/描述从后台页面 SEO 读取（`pageMetadata`），不再用模板内置文案。
+- **自动生成 JSON-LD**：站点级 `Organization`/`WebSite` + 文章 `Article` / 产品 `Product` / `BreadcrumbList`。
+- **站点 logo 设置**：后台「站点设置」上传 logo，公开 API 返回 `logoUrl`；模板按「后台 logoUrl → `public/logo.png` → 空」回退。
+- 细节：「多语言基线与 SEO」「结构化数据与站点 logo」
+
+## 内容翻译
+
+- **翻译覆盖全类型页面块文本**：`list`（列名 + 文本列单元格）、`carousel`/`gallery`（alt/title）、`single-image`（alt/caption）、`json`（递归自然语言字符串）等**都翻**——早期版本对非 `text`/`html` 块是**原样复制**。
+- **SEO 关键词参与翻译**：`keywords` 数组与 `metaTitle`/`metaDescription`/`ogTitle`/`ogDescription` 一并翻译。
+- **文章/产品 SEO 落库**：翻译后写入目标语言的 `seoJson`（此前完全不写）。
+- **分类/标签可翻译**：新增翻译表 `CategoryTranslation`/`TagTranslation`，公开 API 按 `locale` 返回本地化名称（`slug` 不变）。
+- **任务化 + 可离开 + 手动保护**：`AiTask` 驱动，进度条、可离开页面、终态如实（completed/partial/failed）；文章/产品保留手动翻译保护。
+- **后台语言与前台解耦**：翻译目标是「前台启用的全部语言」，与录入语言无关。
+- **完整性判定如实化**：判定变严后，**对既有内容再点一次「翻译到所有语言」即可自动补翻**漏掉的部分。
+- 细节：「内容翻译体系」「页面块调用与渲染」「后台翻译操作」
+
+## 公开 API
+
+- **文章列表分页信封**：`content/posts` 支持 `response: "envelope"`（`pagination` + 语言元信息），与产品同构。
+- **分类树接口**：`content/categories?type=post|product&locale=xx` 返回**分类树**（roots + 递归 children），`name` 按 `locale` 本地化。
+- **预渲染端点**：`site/published-routes`、`site/locale-routes` 供模板生成静态路由与真实翻译路径切换。
+- 细节：「公开 API 参考」
+
+## 平台后台与权限
+
+- **Scoped RBAC**：角色/权限/资源范围化，成员按站点与功能授权；CMS 导航与控件按「有效能力」裁剪（无写权限时隐藏/置灰）。
+- **分类/标签翻译入口**：后台分类/标签管理新增「翻译到所有语言」（确认 + 进度）。
+
+## 平台运维
+
+- **Prisma 连接池收紧**：每 serverless 实例连接数上限由 10 降到 2，空闲连接 30s 回收，避免共享 PostgreSQL 连接被打满导致全站 500 / 构建期取数卡死。根治仍建议加连接池（PgBouncer）。
+
+## 从哪里看
+
+- 客户使用：「客户使用指南」各篇。
+- 模板开发（新项目）：「模板开发规范」「列表分页与静态化」「内容翻译体系」「结构化数据与站点 logo」「多语言基线与 SEO」「公开 API 参考」。
+- 平台后台：「平台后台手册」各篇（含「后台翻译操作」）。

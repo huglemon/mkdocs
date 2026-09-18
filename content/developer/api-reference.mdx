@@ -32,13 +32,16 @@ X-Site-Secret: <站点密钥>
 
 | 接口 | 方法 | 用途 |
 |---|---|---|
-| `site/settings` | GET | 站点公开设置和语言配置 |
+| `site/settings` | GET | 站点公开设置、语言配置与 logo |
 | `site/navigation` | POST | 导航树 |
+| `site/published-routes` | GET | 已发布内容清单（sitemap / 静态参数） |
+| `site/locale-routes` | GET | 单个资源的真实翻译路径（语言切换） |
 | `pages/:slug` | GET | 页面、内容块和 SEO |
-| `content/products` | POST | 产品集合 |
+| `content/products` | POST | 产品集合（可选分页信封） |
 | `content/products/:slug` | GET | 完整产品详情 |
-| `content/posts` | POST | 文章集合 |
+| `content/posts` | POST | 文章集合（可选分页信封） |
 | `content/posts/:slug` | GET | 文章详情 |
+| `content/categories` | GET | 分类树（按 locale 本地化名称） |
 | `content/authors/:slug` | GET | 作者与文章 |
 | `forms/:slug` | GET | 动态表单定义 |
 | `inquiry` | POST | 提交询盘 |
@@ -238,7 +241,7 @@ GET /api/v1/pub/b2b/content/products/:slug?locale=en
 
 - `mainImageUrl` 保留用于兼容现有模板。
 - `galleryImages` 严格按 CMS 保存的图册顺序返回；主图不会自动插入图册。
-- `categories` 与 `tags` 始终为数组。
+- `categories` 与 `tags` 始终为数组；其 `name` 按请求 `locale` **本地化**（译文 → 默认语言译文 → 基名），`slug` 跨语言稳定。
 - `contentLocale` 表示正文实际来源语言；`fallbackToDefault` 表示当前请求使用了默认语言回退。
 - 只返回当前站点、`published` 且未软删除的产品；草稿、归档和回收站产品返回 `404`。
 - 主图和图册素材必须属于当前站点且状态为 `active`；失效或跨站点素材会被省略，不会让整个产品请求失败。
@@ -246,9 +249,68 @@ GET /api/v1/pub/b2b/content/products/:slug?locale=en
 
 ---
 
-## 文章、页面与其他资源
+## 文章集合（分页信封）
 
-当前文章集合和详情、页面、导航、表单仍保持既有 v1 契约。后续会按产品同一原则逐步支持：默认轻量集合、白名单 `include`、完整详情、显式 locale fallback 和安全资源投影。
+```text
+POST /api/v1/pub/b2b/content/posts
+```
+
+与产品集合同构，支持 `response: "envelope"` 返回真实分页与语言元信息（默认仍是兼容的裸数组）：
+
+```json
+{
+  "data": [
+    {
+      "id": "post_1",
+      "title": "文章标题",
+      "slug": "post-slug",
+      "summary": "摘要",
+      "coverImageUrl": null,
+      "publishedAt": "2026-09-04T01:00:00.000Z",
+      "author": { "id": "a1", "name": "...", "slug": "...", "avatarUrl": null, "bio": null }
+    }
+  ],
+  "pagination": { "page": 1, "pageSize": 10, "total": 42, "totalPages": 5, "hasNext": true, "hasPrevious": false },
+  "meta": { "requestedLocale": "en", "effectiveLocale": "en", "fallbackUsed": false }
+}
+```
+
+支持 `locale` / `page` / `limit` / `categorySlug(s)` / `categoryIds` / `sort` / `includeFeatured`。
+
+## 分类树
+
+```text
+GET /api/v1/pub/b2b/content/categories?type=post|product&locale=xx
+```
+
+返回**分类树**（根节点数组，子节点递归挂在 `children`），供前台层级侧边栏与 canonical 分类路由消费：
+
+```json
+[
+  {
+    "id": "c1", "name": "木炭", "slug": "charcoal", "sortOrder": 0, "parentId": null,
+    "children": [
+      { "id": "c2", "name": "速燃木炭", "slug": "quick-light", "sortOrder": 0, "parentId": "c1", "children": [] }
+    ]
+  }
+]
+```
+
+- `name` 按 `locale` **本地化**：`locale` 译文 → 默认语言译文 → 主表基名；
+- `slug` **不本地化**，跨语言稳定（因此 `/products/category/<slug>` 在多语言下是同一路径）。
+
+## 预渲染端点
+
+供前台生成静态路由与真实翻译路径切换：
+
+| 接口 | 方法 | 用途 |
+|---|---|---|
+| `site/published-routes` | GET | 已发布内容清单（每条含 `type` / 各语言 `routes` / `lastModified`），sitemap 与静态参数用 |
+| `site/locale-routes` | GET | 单个资源的**真实翻译路径**：`?type=product\|post\|author\|page&slug=xxx` → `{ routes: { en, zh, ... }, frontendLocale }`，语言切换器用 |
+
+## 其余资源
+
+页面、导航、表单、作者等仍保持既有 v1 契约；后续按产品同一原则（默认轻量集合、白名单 `include`、完整详情、显式 locale fallback、安全资源投影）逐步对齐。
 
 ## 缓存
 

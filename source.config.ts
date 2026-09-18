@@ -15,7 +15,7 @@ export const docs = defineDocs({
     },
     files: isWebsite
       ? ["index.mdx", "customer/**/*.{mdx,md}"]
-      : ["index.mdx", "login.mdx", "developer/**/*.{mdx,md}", "platform/**/*.{mdx,md}"],
+      : ["index.mdx", "login.mdx", "whats-new.mdx", "developer/**/*.{mdx,md}", "platform/**/*.{mdx,md}"],
   },
   meta: {
     schema: metaSchema,

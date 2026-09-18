@@ -151,9 +151,11 @@ middleware 把解析出的 locale 写入请求头，root layout 输出：
 
 所有页面类型都有 `generateMetadata`：
 
-- 静态页（首页/about/contact/products/news 列表）：由 `staticPageMetadata()` 生成
-- 产品/文章/作者详情：由 `buildAlternates()` + 真实 locale routes 生成
-- 通用 Page：同上
+- **列表页（首页 / about / contact / products / news）**：由 `pageMetadata()` 读取**后台页面 SEO**（标题/描述/关键词来自 CMS）并生成 canonical/hreflang；首页显式传 `path="/"`。
+- 产品/文章/作者详情：由 `pageMetadata()` / `buildAlternates()` + 真实 locale routes 生成，条目自带 `seo`。
+- 通用 Page：同上。
+
+> 列表页 TDK **来自后台页面 SEO**（早期版本用模板内置文案，已改）。要改列表页标题/描述，请到**后台对应页面的 SEO** 里改，不要再改模板。
 
 规则：
 
@@ -183,6 +185,10 @@ Disallow: /api/
 Disallow: /_next/
 Sitemap: https://站点域名/sitemap.xml
 ```
+
+### 结构化数据与站点 logo
+
+站点级 `Organization`/`WebSite` 由 `layout` 输出；文章/产品详情自动生成 `Article`/`Product`/`BreadcrumbList`。站点 logo 从后台「站点设置」解析（回退 `public/logo.png`）。细节见「结构化数据与站点 logo」。
 
 ## 模板分支要做什么
 

@@ -99,15 +99,24 @@ const formBlock = page?.blocks?.find((b) => b.type === "form" && b.data?.formSlu
 
 这保证部分翻译的页面不会因少翻译一个块而整页缺结构。
 
-### 页面翻译会复制完整结构
+### 页面翻译：复制结构 + 翻译全类型文本
 
-后台「翻译管理」翻译页面时，会复制**全部**默认语言 active 块到目标语言：
+后台翻译页面时，会复制**全部**默认语言 active 块到目标语言，并翻译其中的**自然语言文本**：
 
-- `text`：heading + text 翻译
-- `html`：HTML 文本翻译，保留标签
-- `single-image / carousel / gallery / list / json / form / post-list / product-list / group`：结构 + 配置原样复制，图片 URL、链接、表单 slug、列表查询参数保留
+| type | 翻译的字段 |
+|---|---|
+| `text` | `heading`、`text` |
+| `single-image` | `alt`、`caption` |
+| `carousel` | 每个 item 的 `alt`、`title` |
+| `gallery` | `title` + 每个 item 的 `title` |
+| `list` | 每列 `label` + 文本列（`text`/`textarea`）单元格 |
+| `html` | HTML 文本，**保留标签** |
+| `json` | 递归翻译其中像自然语言的字符串（跳过 URL / 纯数字） |
+| `post-list` / `product-list` / `group` / `form` | 无用户文本：仅复制结构/配置 |
 
-目标语言块可再人工微调图片标题、列表文字等。
+> **早前版本**对非 `text`/`html` 块是**原样复制**（不翻译），已修正。对历史内容再点一次「翻译到所有语言」即会**补翻**漏掉的部分。
+
+列类型为 `image`/`link`/`icon`/`number` 的单元格**不翻译**（不是自然语言）；配置类字段（图片 URL、链接、表单 slug、列表查询参数）跨语言共享。目标语言块仍可人工微调。
 
 ### 动态列表块
 

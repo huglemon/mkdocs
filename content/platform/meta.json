@@ -1,5 +1,5 @@
 {
   "title": "平台后台手册",
   "icon": "Shield",
-  "pages": ["overview", "sites", "deploy", "language"]
+  "pages": ["overview", "sites", "deploy", "language", "translation"]
 }

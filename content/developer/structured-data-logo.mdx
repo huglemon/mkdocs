@@ -1,0 +1,75 @@
+---
+title: 结构化数据与站点 logo
+description: JSON-LD 自动生成（站点级 + 内容级）与站点 logo 的解析回退。
+icon: Braces
+---
+
+# 结构化数据与站点 logo
+
+main 内置**结构化数据（JSON-LD）自动生成**与**站点 logo 解析**，新模板分支不需要手写。
+
+## 站点 logo
+
+后台「站点设置」可上传 **站点 logo**（素材选择器）。公开 API `site/settings` 返回解析后的 `logoUrl`。
+
+模板侧 `lib/structured-data.ts` 的 `siteLogoUrl(settings)` 按**回退链**取 logo：
+
+```text
+后台 logoUrl  →  public/logo.png（仓库内存在时）  →  undefined（不输出）
+```
+
+用途：结构化数据里的 `publisher.logo` / `brand.logo`，以及需要站点标识的位置。
+
+## JSON-LD 分两层
+
+### 站点级（`app/[lang]/layout.tsx`）
+
+每个页面都会输出站点实体，供搜索引擎理解站点：
+
+- `Organization`（公司名 / logo / 联系方式 / 地址）
+- `WebSite`
+
+### 内容级（详情页）
+
+| 页面 | 生成的 JSON-LD |
+|---|---|
+| 文章详情 `/news/[slug]` | `Article` + `BreadcrumbList` |
+| 产品详情 `/products/[slug]` | `Product` + `BreadcrumbList` |
+| 页面/列表 | 站点级即可 |
+
+## 轮子：`lib/structured-data.ts`
+
+| 导出 | 用途 |
+|---|---|
+| `siteStructuredData(settings, …)` | 站点级 Organization / WebSite |
+| `articleStructuredData(post, ctx)` | 文章 Article |
+| `productStructuredData(product, ctx)` | 产品 Product |
+| `breadcrumbStructuredData(items)` | 面包屑 BreadcrumbList |
+| `withInLanguage(json, locale)` | 注入 `inLanguage` |
+| `absoluteUrl(path)` | 相对路径 → 绝对 URL（结构化数据要求绝对 URL） |
+| `siteLogoUrl(settings)` | 上面所述的 logo 回退 |
+
+渲染组件：`components/common/json-ld.tsx` 的 `<JsonLd data locale />`（**转义 `<`**，避免脚本注入）。
+
+```tsx
+import { JsonLd } from "@/components/common/json-ld";
+import { articleStructuredData, breadcrumbStructuredData } from "@/lib/structured-data";
+
+<JsonLd data={articleStructuredData(post, ctx)} locale={lang} />
+<JsonLd data={breadcrumbStructuredData([
+  { name: "Home", path: hrefHome(lang, isMultilingual) },
+  { name: "News", path: hrefLang(lang, "/news", isMultilingual) },
+  { name: post.title, path: hrefLang(lang, `/news/${post.slug}`, isMultilingual) },
+])} locale={lang} />
+```
+
+## 与 SEO 的关系
+
+- `SeoJson.jsonLd` 字段（后台自定义结构化数据）与自动生成**并存**：页面在渲染自动 JSON-LD 之外，会把后台配置的 `jsonLd` 一并输出。
+- 其余 SEO（title/description/canonical/hreflang）见「多语言基线与 SEO」。
+
+## 新项目开发怎么用
+
+- 站点级 JSON-LD 在 `layout` 里已生效，**无需改动**。
+- 详情页若要输出 `Article`/`Product`，**复用** `lib/structured-data.ts`，不要自己拼 `application/ld+json`。
+- logo 通过后台「站点设置」配置即可，模板按 `siteLogoUrl(settings)` 取，不要硬编码路径。

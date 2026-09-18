@@ -35,7 +35,15 @@ icon: Blocks
 
 ## 环境变量
 
-`.env.local` 必须配置：ADMIN_API_URL（admin 地址）、SITE_ID（站点 id）、SITE_SECRET（站点密钥）。
+`.env.local` 必须配置：
+
+```text
+ADMIN_API_URL    admin 地址（如 https://b2b.inwindoverseas.com）
+SITE_ID          站点 id
+SITE_SECRET      站点密钥
+```
+
+三项齐全时，语言配置、内容、导航、logo 均从后台读取。Admin API 不可达时用 env 兜底：`DEFAULT_LOCALE`、`LOCALES`（逗号分隔）。
 
 ## 部署
 
@@ -44,7 +52,11 @@ icon: Blocks
 ## 验证
 
 ```bash
-pnpm types:check
-pnpm build
-pnpm dev --webpack
+npm run build   # next build：编译 + 生成静态路由（含 TypeScript 检查）
+npm run dev     # 本地预览 http://localhost:3000
 ```
+
+## 相关文档
+
+- 列表分页与静态化、内容翻译体系、结构化数据与站点 logo —— 见「模板开发」分区。
+- 数据契约（公开 API）—— 见「公开 API 参考」。

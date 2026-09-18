@@ -4,6 +4,9 @@
   "pages": [
     "template-guide",
     "template-i18n-seo",
+    "structured-data-logo",
+    "listing-pagination",
+    "translation-system",
     "template-customization",
     "page-blocks",
     "locale-url",

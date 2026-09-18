@@ -14,7 +14,10 @@ icon: Search
 
 ## 前台生效
 
-前台读取页面 SEO 配置，生成 title、meta description、Open Graph 等标签。
+前台读取页面 SEO 配置，生成 `<title>`、`meta description`、Open Graph、关键词等。
+
+- **首页、产品、新闻、关于、联系等列表页**的标题/描述也取自**后台页面 SEO**（不是模板写死的文案）——要改这些页面的 TDK，到对应页面的 SEO 里改；
+- canonical、hreflang、`<html lang>`、结构化数据（JSON-LD）由前台**自动生成**，无需手动配置。
 
 ## 最佳实践
 
@@ -25,4 +28,4 @@ icon: Search
 
 ## 多语言 SEO
 
-多语言站每语言可单独配置 SEO。
+多语言站每语言可单独配置 SEO。「翻译到所有语言」会把 SEO（Meta 标题/描述、**关键词**、Open Graph）一并翻译到各语言。

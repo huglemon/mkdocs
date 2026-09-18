@@ -1,0 +1,103 @@
+---
+title: 列表分页与静态化
+description: 产品和新闻列表的 canonical 路径分页、旧 query 308、capped SSG 与构建期有界并发——main 已内置，分支只做视觉。
+icon: ListOrdered
+---
+
+# 列表分页与静态化
+
+产品与新闻列表统一使用 **canonical 路径分页**（不是 `?page=`）。分页、分类、静态生成与构建期取数全部由 `lib/content-list.ts` 提供，**main 已内置，模板分支不需要也不应该重写**。
+
+## 为什么用路径而不是 query
+
+```text
+/products          第 1 页
+/products/page/2   第 2 页
+/products/category/charcoal          分类第 1 页
+/products/category/charcoal/page/2   分类第 2 页
+```
+
+- 每个页码都是**独立可索引 URL**，有利于收录与分享；
+- 与 SEO/`canonical`/hreflang 一致，避免 query 组合爆炸；
+- 旧模板的 `?page=N` 由 middleware **308 永久迁移**到 canonical 路径（见下）。
+
+## URL 形态
+
+| 内容 | 第 1 页 | 第 N 页 | 分类第 1 页 | 分类第 N 页 |
+|---|---|---|---|---|
+| 产品 | `/products` | `/products/page/N` | `/products/category/<slug>` | `/products/category/<slug>/page/N` |
+| 新闻 | `/news` | `/news/page/N` | `/news/category/<category>` | `/news/category/<category>/page/N` |
+
+> 产品与新闻**完全对称**：main 里两者是同一套模式的两份实例，改动其一请同步另一个。
+
+## 旧 query → canonical：middleware 308
+
+`middleware.ts` 把旧式 query 分页永久重定向到路径分页（保留其它 query）：
+
+```text
+/products?page=2                        -> 308 /products/page/2
+/products/category/charcoal?page=2      -> 308 /products/category/charcoal/page/2
+/news?category=xxx&page=2               -> 308 /news/category/xxx/page/2
+```
+
+`/products/page/1` 等非法页码由页面 `notFound()` 返回 **404**（第 1 页只在集合根路径）。
+
+## 轮子：`lib/content-list.ts`
+
+列表的**数据 + 路由**都在这一个文件（`news*` 与 `products*` 成对）：
+
+| 导出 | 用途 |
+|---|---|
+| `NEWS_PAGE_SIZE` / `PRODUCTS_PAGE_SIZE` | 每页数量（新闻 10、产品 12） |
+| `newsPath` / `productsPath` | 构造 canonical 路径（`category?`/`page`） |
+| `newsPathFromLegacyQuery` / `productsPathFromLegacyQuery` | 旧 query → 路径（middleware 用） |
+| `parsePage` | 解析并校验页码 |
+| `getNewsPage` / `getProductsPage`（经 `getPostsPage`） | 服务端取「分页信封」 |
+| `getNewsStaticParams` / `getProductsStaticParams` | 构建期产出 capped 静态路由参数 |
+
+取数走 **分页信封**（`api-client` 的 `getNewsPage`/`getProductsPage` 内部 `response: "envelope"`），拿到 `{ data, pagination, meta }`，不再用大 `limit` 猜测总页数。接口契约见「公开 API 参考」。
+
+## 静态化与 ISR
+
+每个分页/分类路由声明 `revalidate = 300`：
+
+```
+generateStaticParams()  从 getProductStaticParams()/getNewsStaticParams() 取「受 cap 控制」的参数
+其余长尾路径            走 ISR，首次访问按需生成
+```
+
+cap（可由 env 覆盖）：
+
+```text
+STATIC_PRERENDER_MAX_PAGES       每个语言/分类最多预渲染几页（默认 10）
+STATIC_PRERENDER_MAX_CATEGORIES  最多预渲染几个分类（默认 20）
+STATIC_PRERENDER_CONCURRENCY     构建期取页数的并发上限（默认 5）
+```
+
+<Callout type="warn" title="构建期取数：有界并发 + 记忆化（务必保留）">
+  `getNewsStaticParams` / `getProductsStaticParams` 会在**构建期**为每个「语言 × 分类」取一次总页数。
+
+  - 早期实现逐条**串行** `limit:1000` 全量拉取，并在多个分页路由里**重复计算**，导致 `Collecting page data` 阶段产生上百次串行 CMS 往返，**构建被拖到几十分钟甚至卡死**。
+  - 现行实现：**按分页信封读 `pagination.totalPages`**（不再全量拉）、**进程内记忆化**（同一函数被多个路由调用只算一次）、**有界并发**（`mapLimited`，默认 5）。
+
+  改列表逻辑时**不要**退回串行全量拉取，也不要绕过记忆化。
+</Callout>
+
+## 新项目开发怎么用
+
+- 分页 URL、`generateStaticParams`、308、取数**都已在 main 里**，新分支**直接可用**。
+- 你要做的是**视觉**：列表卡片、分类侧栏、分页控件外观。
+- 分页控件请复用 `components/common/pagination.tsx`（传入 `buildHref`），不要自己拼 `?page=`。
+
+## 验收
+
+```text
+/products                      200
+/products/page/2               200
+/products/page/1               404
+/products/category/<slug>      200
+/products?page=2               308 -> /products/page/2
+/news?page=2                   308 -> /news/page/2
+```
+
+构建日志里应看到 `products/page/[page]`、`products/category/[category]` 等路由被 SSG 预渲染，且 `Collecting page data` 不长时间停滞。
