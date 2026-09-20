@@ -38,6 +38,8 @@ icon: Cloud
 
 Vercel 公开 API 无法设置项目生产分支（`link` 接口会静默忽略 `productionBranch` / `branch`，`PATCH /v9/projects` 直接拒绝该字段），所以「连接 Git 并选对分支」只能在 Vercel 面板人工完成，且**必须逐站核对**。绑成 `main` 会让模板 `main` 一推送就误覆盖该客户站——这是真实发生过的故障，务必避免。
 
+> 连接仓库这一步**只选仓库、不选分支**，连接后生产分支默认为 `main`；分支要在 **Settings → Environments → Production → Branch Tracking** 里单独修改（见下方步骤）。
+
 **自动守卫（fail-safe）**
 
 - **部署前**：发现项目已连 Git 且生产分支 ≠ 该站客户分支 → 立即调用官方接口断开其自动部署。
@@ -49,8 +51,11 @@ Vercel 公开 API 无法设置项目生产分支（`link` 接口会静默忽略 
 ### 给某站开启「push 自动上线」
 
 1. 确认 **AI Worker 已重启**（定时审计跑在 Worker 里，未重启则守卫未武装）。
-2. Vercel 面板打开该站项目 → **Settings → Git → Connect Git Repository**，选择模板仓库。
-3. 在 **Production Branch** 选择 `client-{站点}`（例：项目 `site-client-yimu-charcoal` → 分支 `client-yimu-charcoal`）。
+2. Vercel 面板打开该站项目 → **Settings → Git → Connect Git Repository**，选择模板仓库并连接。
+   > 此步**只能选仓库，不能选分支**；连接后生产分支按 `main` → `master` → 仓库默认分支的顺序自动选中，实际就是 `main`。
+3. 切到 **Settings → Environments → Production → Branch Tracking**，把分支名改为 `client-{站点}` 并 **Save**。
+   （例：项目 `site-client-yimu-charcoal` → 分支 `client-yimu-charcoal`）
+   > 第 2 步完成到第 3 步保存之间，生产分支是 `main`——这段时间若有 `main` 推送，会被当成该客户站的生产发布。请尽快完成第 3 步；守卫会在发现不一致时断开，但最多滞后一个审计周期。
 4. 回后台站点详情看「部署状态」那行是否**变绿**；橙色代表绑错，守卫会把自动部署断开。
 5. 之后 push 该客户分支即自动上生产。
 
