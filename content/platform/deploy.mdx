@@ -36,7 +36,16 @@ icon: Cloud
 
 **关键约束：连接 Git 时，生产分支必须等于该站客户分支。**
 
-Vercel 公开 API 无法设置项目生产分支（`link` 接口会静默忽略 `productionBranch` / `branch`，`PATCH /v9/projects` 直接拒绝该字段），所以「连接 Git 并选对分支」只能在 Vercel 面板人工完成，且**必须逐站核对**。绑成 `main` 会让模板 `main` 一推送就误覆盖该客户站——这是真实发生过的故障，务必避免。
+生产分支的真身是 Production 环境的 `branchMatcher`（`{ type: "equals", pattern: "main" }`）。**连接仓库这一步可由 API 自动化，分支却不能**——实测结论：
+
+| 尝试 | 结果 |
+| --- | --- |
+| `POST /v9/projects/{id}/link` 带 `productionBranch` / `branch` | 200，但字段被**静默忽略** |
+| `PATCH /v9/projects/{id}` 带 `productionBranch` / `branchMatcher` / `systemEnvironments` | **400**（拒绝未知字段） |
+| `PATCH` / `PUT` `/v9/projects/{id}/environments[/production]` | **404** |
+| `GET /v9/projects/{id}/environments` | ✅ 200，**只读** |
+
+所以：**不自动化 connect**——自动连接只会得到绑在 `main` 的项目，随后就被守卫断开，毫无意义。连接与分支必须**成对人工完成**。绑成 `main` 会让模板 `main` 一推送就误覆盖该客户站，这是真实发生过的故障。
 
 > 连接仓库这一步**只选仓库、不选分支**，连接后生产分支默认为 `main`；分支要在 **Settings → Environments → Production → Branch Tracking** 里单独修改（见下方步骤）。
 
