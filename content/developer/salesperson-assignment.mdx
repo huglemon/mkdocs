@@ -1,0 +1,57 @@
+---
+title: 业务员指派
+description: 模板如何把访客解析到业务员——访客 cookie、联系按钮、表单指派与 umami 事件。
+icon: UserRound
+---
+
+# 业务员指派
+
+多站点把询盘**分派给业务员**（销售），模板侧需要三件事：**标识访客**、**渲染联系按钮**、**提交时带上上下文**。解析本身在 CMS 侧完成，模板只管接线。
+
+## 1. 标识访客（HttpOnly cookie）
+
+模板在 `middleware` 给每个访客写一个稳定的 UUID cookie：
+
+```text
+cookie: iw_visitor   (HttpOnly, 1 年)
+```
+
+- **HttpOnly，不下发浏览器 JS**——所以浏览器取数要走模板自身的 `/api/client/*` **服务端代理**，由代理在服务端注入 `visitorKey`（沿用现有代理模式，免 CORS、免泄露）。
+- 解析接口要求 `visitorKey` 是**合法 UUID**；缺失或非法返回 `400`。
+
+## 2. 联系按钮（ContactButton）
+
+详情页/页面里放「联系」入口，两种形态：
+
+- **whatsapp**：解析到业务员后直接跳 `wa.me/<号码>`；
+- **form**：弹一个询盘表单，提交时带上解析上下文。
+
+按钮可**显式绑定候选**（如「联系作者」→ 绑定该文章/产品的作者）：
+
+```text
+POST /api/v1/pub/b2b/salesperson/resolve
+{ visitorKey, scene, candidateUserIds: [authorUserId] }
+```
+
+`candidateUserIds` 会**覆盖访客粘性**（这是元素级强意图）；不传则按站点规则解析。
+
+## 3. 表单指派
+
+后台表单可设「**轮流分给选定的业务员**」。表单提交时带 `formTemplateId`，解析接口会把它作为候选池参与解析（**不覆盖**访客粘性）。
+
+## 4. 解析结果怎么用
+
+`resolve` 返回 `salesperson` / `contacts` / `eventName` / `fallbackFormTemplate` / `protectionExpiresAt`，字段含义见「公开 API 参考」的 **业务员解析** 一节。
+
+- `contacts` 为空时优先用 `fallbackFormTemplate` 渲染表单（公海兜底）；
+- `eventName` 用于 **umami 事件**：`scene_slug`（有业务员）或 `scene`（站点级）——`slug` 稳定，改名不切割统计。
+
+## 5. 表单提交带上下文
+
+询盘提交（`inquiry`）带 `visitorKey` 时，CMS 会在**同一事务**里置 `assignedTo`（业务员）与 `visitorKey / visitorId`，因此列表能直接看到「指派给谁」，且同一访客后续询盘归同一业务员（保护期内）。
+
+## 相关文档
+
+- 解析接口字段：「公开 API 参考」→ 业务员解析
+- 后台配置与分派规则：「表单与询盘」（客户指南）
+- 翻译与自动发布：见「内容翻译体系」

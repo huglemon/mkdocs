@@ -12,6 +12,7 @@
     "locale-url",
     "content-ingest",
     "assets-api",
+    "salesperson-assignment",
     "api-reference"
   ]
 }

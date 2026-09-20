@@ -24,6 +24,7 @@ icon: Languages
 | **产品 Product** | 标题、摘要、正文 + **SEO（seoJson）** | `ProductTranslation.seoJson` |
 | **分类 Category** | 名称 + 描述 | `CategoryTranslation(name, description)` |
 | **标签 Tag** | 名称 | `TagTranslation(name)` |
+| **作者 Author** | 名字 + 简介（`slug` 不翻译） | `AuthorTranslation(name, bio)` |
 
 分类/标签的 `name` 主表字段保留为**默认语言录入值**；目标语言译文存翻译表，公开 API 按请求 locale 解析（`slug` 不本地化，URL 跨语言稳定）。
 
@@ -87,6 +88,24 @@ metaTitle / metaDescription / keywords[] / ogTitle / ogDescription
 - 翻译体系完全在**后台 + 模板基线**里，新分支**不需要任何改动**。
 - 模板只需按 `locale` 取数（`getPage` / `getPosts` / `getProducts` / `getCategoryTree(type, locale)`）——`main` 已内置。
 - 分类/标签的**本地化名称**由 API 按 `locale` 返回（见「公开 API 参考」），模板侧栏无需处理。
+
+## 译文手工编辑（分类 / 标签 / 作者）
+
+除 AI 生成外，分类 / 标签 / 作者的译文可**逐语言人工编辑**：
+
+- 后台 action：`saveCategoryTranslations / saveTagTranslations / saveAuthorTranslations`——守卫 `translate.execute` + 同站资源校验，**仅接受本站启用且非默认语言**；`name` 为空即**删除该语言译文**；
+- UI 组件 `TranslationEditorDialog`（每语言一行 + 源语言只读参考），入口在「翻译」弹窗内的「编辑现有翻译」文字链接（行内只保留一个翻译图标）；
+- 与「确认翻译」（AI 生成 / 覆盖）分工：编辑 = 人工校对，AI 不介入。
+
+## 周期任务「直接发布」时的自动翻译
+
+多语言站的周期任务勾选「直接发布」后，生成的文章**不会立即发布**——`runSchedule`：
+
+1. 以 `status=draft` 生成文章；
+2. **内联**逐语言调用 `translatePostInternal`（源语言除外），进度记为该任务上的「**全量翻译**」步骤（`ai-tasks-table` 有对应中文标签）；
+3. **全部语言完成后**才把文章置为 `published`。
+
+翻译中途失败则文章**保持草稿**（前台不可见），该步骤记 `failed`。注意这套逻辑跑在 **AI Worker** 的 `runSchedule` 里，改动需 Dokploy 重新部署生效。
 
 ## 相关文档
 

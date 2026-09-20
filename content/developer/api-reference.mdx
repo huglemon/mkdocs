@@ -47,6 +47,7 @@ X-Site-Secret: <站点密钥>
 | `content/authors/:slug` | GET | 作者与文章 |
 | `forms/:slug` | GET | 动态表单定义 |
 | `inquiry` | POST | 提交询盘 |
+| `salesperson/resolve` | POST | 按访客解析业务员（联系按钮 / 询盘指派） |
 
 ---
 
@@ -110,6 +111,7 @@ POST /api/v1/pub/b2b/content/products
 |---|---|
 | `gallery` | `galleryImages` |
 | `content` | `contentHtml` |
+| `sections` | `sections`（产品自定义段，见「产品详情」） |
 | `properties` | `propertiesJson` |
 | `categories` | `categories` |
 | `tags` | `tags` |
@@ -213,6 +215,15 @@ GET /api/v1/pub/b2b/content/products/:slug?locale=en
   "slug": "product-slug",
   "summary": "产品摘要",
   "contentHtml": "<p>产品正文</p>",
+  "sections": [
+    {
+      "id": "sec_1",
+      "key": "specs",
+      "type": "attributes",
+      "title": "规格参数",
+      "items": [ { "label": "直径", "value": "33mm" } ]
+    }
+  ],
   "mainImageUrl": "https://cdn.example.com/product.jpg",
   "galleryImages": [
     {
@@ -244,6 +255,7 @@ GET /api/v1/pub/b2b/content/products/:slug?locale=en
 - `mainImageUrl` 保留用于兼容现有模板。
 - `galleryImages` 严格按 CMS 保存的图册顺序返回；主图不会自动插入图册。
 - `categories` 与 `tags` 始终为数组；其 `name` 按请求 `locale` **本地化**（译文 → 默认语言译文 → 基名），`slug` 跨语言稳定。
+- `sections` 是**产品自定义段**（类型化数组：`attributes` 属性表 / `text` 富文本 / `gallery` 图集）。每段带**语言无关的 `key`（field_name）**，模板据此定向取用（如 `sections.find(s => s.key === "specs")`）；`title`/`label` 按语言本地化，**`key` 不翻译**。目标语言无译文时回退默认语言，均无则为 `null`。列表接口需 `include: ["sections"]`。
 - `contentLocale` 表示正文实际来源语言；`fallbackToDefault` 表示当前请求使用了默认语言回退。
 - 只返回当前站点、`published` 且未软删除的产品；草稿、归档和回收站产品返回 `404`。
 - 主图和图册素材必须属于当前站点且状态为 `active`；失效或跨站点素材会被省略，不会让整个产品请求失败。
@@ -343,6 +355,50 @@ GET /api/v1/pub/b2b/content/tags?type=post|product&locale=xx
 - 列表接口 `content/posts` / `content/products` 支持**按标签过滤**：请求体传 `tagSlugs: ["quick-light"]`（或 `tagIds: ["tag_1"]`），与 `categorySlug(s)` 并列。
 - 模板据此提供标签页 `/{lang}/products/tag/<slug>`、`/{lang}/news/tag/<slug>`。
 
+## 业务员解析（联系按钮 / 询盘指派）
+
+```text
+POST /api/v1/pub/b2b/salesperson/resolve
+```
+
+前台「联系按钮」与表单用它把访客解析到**一位业务员**，返回联系方式与 umami 事件名。
+
+请求体：
+
+```json
+{
+  "visitorKey": "8f0c…-uuid",
+  "scene": "product-demo-product",
+  "candidateUserIds": ["user_1"],
+  "formTemplateId": "form_1"
+}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `visitorKey` | 访客稳定标识（UUID）。模板在 middleware 写 **HttpOnly cookie `iw_visitor`**，经自身 `/api/client/*` 代理在**服务端**注入请求，不下发浏览器 |
+| `scene` | 场景名（≤40 字），用于 umami 事件名 |
+| `candidateUserIds` | 可选。显式候选（如「联系作者」按钮绑定作者） |
+| `formTemplateId` | 可选。命中表单若设了「轮流分派」，其候选池参与解析 |
+
+响应：
+
+```json
+{
+  "source": "salesperson",
+  "salesperson": { "id": "user_1", "displayName": "张三", "whatsapp": "+86…", "email": null, "phone": null },
+  "contacts": { "email": null, "phone": null, "whatsapp": "+86…" },
+  "eventName": "product-demo-product_zhangsan",
+  "fallbackFormTemplate": { "id": "form_1", "slug": "default-inquiry" },
+  "protectionExpiresAt": "2026-12-18T…"
+}
+```
+
+- **解析优先级**：访客粘性(1) → 显式候选数组(2) → 表单 sequential 池(3) → 站点全池(4)；无可用时 `source="site"`、`salesperson=null`、`contacts` 为**站点级兜底**（公海）。
+- **粘性只受显式候选约束**：联系按钮指定的人会覆盖粘性；表单指派池**不会**夺走粘性访客。
+- 同一 `visitorKey` 在**保护期**（默认 90 天）内稳定命中同一业务员。
+- `eventName` = `scene_slug`（有业务员）或 `scene`（站点级），供 umami 事件对账。
+
 ## 预渲染端点
 
 供前台生成静态路由、sitemap 与真实翻译路径切换：
@@ -369,6 +425,8 @@ GET /api/v1/pub/b2b/site/sitemap
 ## 其余资源
 
 页面、导航、表单、作者等仍保持既有 v1 契约；后续按产品同一原则（默认轻量集合、白名单 `include`、完整详情、显式 locale fallback、安全资源投影）逐步对齐。
+
+> **作者本地化**：`content/authors/:slug` 与文章的 `author` 字段，其 `name` / `bio` 按请求 `locale` **本地化**（`AuthorTranslation`：目标语言 → 默认语言 → 主表）；`slug` 跨语言稳定。
 
 ## 缓存
 
