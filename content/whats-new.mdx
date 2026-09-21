@@ -8,6 +8,47 @@ icon: Sparkles
 
 本页汇总 **2026-09-04 之后** 平台（CMS + 模板）上线的能力。每条给出「做了什么修改」和细节文档入口。
 
+## 登录体系：手机号登录 · 手机号绑定 · 短信改密（2026-09-21）
+
+### 登录页改为 Tab 切换（新）
+- 「手机号登录」（默认）与「邮箱登录」以 **Tab 切换**，取代原先两套表单上下并列；两个表单的错误提示各自归入所属 Tab（此前邮箱错误挂在页面顶部，切了 Tab 也看得到）。
+- `?reset=1`（改密成功回跳）时默认落在邮箱 Tab——否则「请使用新密码登录」的横幅与展示的手机号表单自相矛盾。
+- 新增 `components/ui/tabs.tsx`（封装 base-ui Tabs，含 root/list/tab/panel），激活态消费 `data-active`。
+
+### 手机号 + 短信验证码登录（新）
+- 阿里云短信通道用**零依赖手写 HMAC-SHA1 签名**实现，未引官方 SDK——其依赖树会拖入 moment / lodash / ws / xml2js 约 20MB，且需要 `serverExternalPackages` + 动态导入，风险只在真 Vercel 部署才暴露。项目已有手写签名先例（`lib/auth/wechat-relay.ts`）。
+- 发送语义：**AK + 签名 + 模板四项齐备才真发**；只配 AK 而缺签名/模板**直接报错、不降级 mock**，避免「以为发了其实没发」；mock 仅限本地 dev 打印验证码，**Preview / Production 一律拒绝**（Preview 与生产同库，若走 mock 会把真实用户验证码写进日志）。
+- 限流抽到 `lib/auth/otp-guard.ts`：登录/绑定与短信改密**共用同一组 Redis 预算**（同号 1h≤5、同号 60s 冷却、同 IP 1h≤20），否则交替打两个端点即可拿到 2× 短信额度。
+
+### 手机号绑定 / 换绑（新）
+- 「右下角头像 → 账号设置」新增手机号区块，走插件内置 `verify({ updatePhoneNumber: true })`（需登录态，不校验旧号）。
+- 手机号真值用 `useSession()` 读取——官方 `phoneNumberClient` 注册了 atomListeners，绑定成功后 `$sessionSignal` 会自动刷新。
+- **不提供「解绑」**：手机号可能是该用户唯一的登录凭证，解绑会把自己锁死；只支持换绑（新号覆盖旧号）。
+
+### 短信验证码重置密码（新）
+- 新增「忘记密码」页，建在插件内置 `requestPasswordReset` / `resetPassword` 上，不自研。注意 `resetPassword` 的字段是 **`otp`**，与登录 `verify` 的 `code` 不同。
+- 开 `revokeSessionsOnPasswordReset`：**重置成功后清空该账号全部 session**（否则被窃 session 依然有效）。
+- 全程防枚举：手机号未注册也返回成功，前端文案不区分。
+- 重置密码页改用 compact 外壳（logo 左上角 + 表单略高于居中），与 404 一致；`BrandShell` 新增 `contentAlign`，登录/注册保持大 logo 居中不变。
+
+### 未绑定手机号不再静默建号（行为变更）
+- 此前未绑定的手机号会被插件**静默建出一个零权限空账号**（占位邮箱 `{号}@phone.inwind.local`、无密码、role=user）——既绕过邀请制（`disableSignUp: true`、注册页写着「账号由邀请开通」），用户又被登进一个什么都点不了的后台。
+- 现改为：验码通过后发现该号未绑定 → 返回 400 `PHONE_NOT_REGISTERED` → 登录页转入引导步「用邮箱和密码登录并绑定」，并可一键切到邮箱 Tab（切换后显式接管焦点，避免焦点掉到 body）。
+- 实现上保留 `signUpOnVerification`，由 `databaseHooks.user.create.before` 在建库前抛 `APIError` 拦下——这样**保住插件内置的验码保护**（`allowedAttempts` 防爆破 / `expiresAt` / 原子消费），无需自定义 `verifyOTP`（那条路会丢掉全部保护）。
+- **判断刻意留在验码之后**：内置校验是「先消费再比码」，故「该号未注册」只有持有正确验证码的人才能得知。若把查库前移到验码之前，任何人对任意号码发一个乱码就能读出该号是否注册——那是注册枚举预言机。代码内已加 ⚠️ 注释防止后人「优化」成前置检查。
+- 本轮不做自助建号（零权限待授权账号），建号仍走邀请制。
+
+### 修复
+- **`Verification` 缺 `updatedAt`**：better-auth 1.6 创建验证码记录时同时写 `createdAt` / `updatedAt`，缺列导致 `send-otp` 在落库阶段 500（且早于 `sendOTP` 回调，故 mock 通道连验证码都不打）。已补列（迁移 `20260921000000`）。
+- **限流报错变成 500 空响应体**：守卫抛裸 `Error` 会被 better-auth 折成 500 且 body 为空，客户端拿不到任何提示。改抛 `APIError` → **429 + 可读文案**。
+- **登录页验证码字段名错**：`verify` 的字段是 `code`，此前误传 `otp`（官网示例里的 `otp` 属于 `reset-password` 端点）。插件客户端 `$InferServerPlugin` 为 `{}`、不做类型推断，故 TS 不报错、运行时静默 400。
+- **库↔schema 漂移收口**（迁移 `20260921010000`）：12 张表的 `updatedAt` 去掉多余的 DB 侧 `DEFAULT`（Prisma 的 `@updatedAt` 始终显式写值，DB DEFAULT 从不生效），并对齐 `Account.providerId` / `Permission.action` / `page_blocks.slug` / `Role.isSystem` / `Site.defaultLocale` 的默认值。
+
+### 运行提示
+- **短信通道开通中**：`ALIYUN_SMS_*` 只配在 Vercel **Production**；运营商报备（移动 / 联通 / 电信）仍在进行，**报备通过前即使网络连通也发不出短信**。期间手机号登录与短信改密不可用（公开站「登录与账号」已注明）。
+- **跨境网络约束**：`vercel.json` 把函数钉在 **hkg1（香港）**，而 `dysmsapi.aliyuncs.com` 解析到**大陆（张家口）** IP，香港→大陆这条跨境路径实测 **8s 超时**（Vercel 没有大陆区域，这是架构约束而非代码问题）。报备通过后若仍超时，需单独规划出口方案。另：老项目 `cms.inwind.cn` 也在香港，**中转过去同样绕不开这条路径**。
+- `ALIYUN_SMS_*` 切勿加 `NEXT_PUBLIC_` 前缀（会打进客户端 bundle 泄露 AK）；改了环境变量须**重新部署**才在 serverless 生效。
+
 ## 业务员指派 · 作者翻译 · 产品自定义段（2026-09-19/20）
 
 ### 业务员管理与询盘指派（新）

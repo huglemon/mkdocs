@@ -3,6 +3,7 @@
   "icon": "Users",
   "pages": [
     "getting-started",
+    "account-and-login",
     "multi-site-switch",
     "manage-content",
     "forms-inquiries",
